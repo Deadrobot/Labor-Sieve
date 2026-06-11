@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.1
+
 - Clarify first-run and post-install setup messages with explicit working directory, config path, report path, and config creation command.
 - Document PyPI plus pipx as the public install and upgrade path.
 - Remove private GitHub raw URLs from public install, preset update, package metadata, and release instructions.
