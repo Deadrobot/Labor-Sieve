@@ -33,8 +33,8 @@ seniority:
 # implementation_support, logistics_process, customer_operations,
 # software_engineering, architect, management, unknown
 #
-# You may add custom snake_case role families here later. Source adapters can
-# emit those values and the scorer will use the configured weight.
+# Custom snake_case role families are valid. The scorer uses the configured
+# weight for matching role_family values emitted by sources or presets.
 role_family_weights:
   sre_infra_ops: 1.00
   data_center_ops: 0.95
@@ -429,7 +429,7 @@ def built_in_options_text() -> str:
         "Built-in role families:",
         "  " + ", ".join(ROLE_FAMILIES),
         "",
-        "Config may add custom snake_case role_family_weights for future adapters.",
+        "Custom snake_case role_family_weights are valid.",
     ]
     return "\n".join(lines)
 

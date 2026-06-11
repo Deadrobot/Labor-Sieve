@@ -1,8 +1,8 @@
 # LaborSieve
 
-LaborSieve is a Linux-first command-line job search and reporting tool for laid-off operations, infrastructure, data center, SRE, logistics/process, and support-adjacent workers.
+LaborSieve is a Linux-first command-line job search and reporting tool for operations, infrastructure, data center, SRE, logistics/process, and support-adjacent roles.
 
-The v1 shape is intentionally small:
+Current scope:
 
 - One editable `config.yaml`
 - One command to run
@@ -13,25 +13,28 @@ The v1 shape is intentionally small:
 
 ## Quick Start
 
-Install from a published package or archive:
+Install from GitHub on a Linux machine:
 
 ```bash
-python3 -m pip install --user pipx
-python3 -m pipx ensurepath
-pipx install labor-sieve
-labor-sieve quickstart
+curl -fsSL https://raw.githubusercontent.com/Deadrobot/Labor-Sieve/main/scripts/install.sh \
+  | sh -s -- git+https://github.com/Deadrobot/Labor-Sieve.git
 ```
 
-Install from a Git URL or self-hosted archive with the installer script:
+Create a working directory, configure preferences, and run a scan:
 
 ```bash
-curl -fsSL https://example.com/labor-sieve/install.sh | sh -s -- https://example.com/labor-sieve-0.1.0.tar.gz
+mkdir -p ~/labor-sieve
+cd ~/labor-sieve
+labor-sieve init
+nano config.yaml
+labor-sieve validate-config
+labor-sieve run
 ```
 
-After this project is on GitHub, the same pattern can install directly from the repository:
+If `labor-sieve` is not found after install, add `~/.local/bin` to the shell path:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/YOUR-USER/labor-sieve/main/scripts/install.sh | sh -s -- git+https://github.com/YOUR-USER/labor-sieve.git
+export PATH="$HOME/.local/bin:$PATH"
 ```
 
 Developer install from a checkout:
@@ -54,7 +57,7 @@ Reports are written under `output/` by default:
 - `output/latest.json`
 - `output/latest.html`
 
-The terminal output only prints scan counts and P0/P1 summaries. The text report includes every job, including rejected jobs, grouped by priority bucket.
+Terminal output prints scan counts and P0/P1 summaries. The text report includes every job, including rejected jobs, grouped by priority bucket.
 
 Jobs are deduplicated before scoring. Exact URL matches are merged first, then normalized company/title/location matches. Reports show the selected source and any merged source references.
 
@@ -67,7 +70,7 @@ labor-sieve doctor
 labor-sieve validate-config
 labor-sieve list-options
 labor-sieve list-presets
-labor-sieve update-presets --index-url https://example.com/labor-sieve/presets/index.json
+labor-sieve update-presets --index-url https://raw.githubusercontent.com/Deadrobot/Labor-Sieve/main/presets/index.json
 labor-sieve use-preset linux-sre
 labor-sieve run
 ```
@@ -92,11 +95,27 @@ labor-sieve run
 
 ## Configuration
 
-The default tuning is aimed at former production operations, infrastructure, Linux/SRE, data center, logistics/process, and implementation-support workers.
+The default configuration prioritizes production operations, infrastructure, Linux/SRE, data center, logistics/process, and implementation-support roles.
 
-Role families are intentionally config-driven. Built-in families are listed in `labor-sieve list-options`, but `role_family_weights` accepts additional snake_case keys so future source adapters or remote preset updates can classify jobs outside the initial SRE/data center focus without a code change.
+Edit these fields in `config.yaml`:
 
-Bundled presets live in `presets/` as small YAML files. Downloaded presets live in `~/.config/labor-sieve/presets/` by default and override bundled presets with the same name.
+- `seniority`: minimum and maximum target seniority.
+- `role_family_weights`: higher values increase priority for a role family.
+- `keywords.boost`: terms that improve a match.
+- `keywords.penalize`: terms that lower a match.
+- `locations`: remote support and acceptable hybrid locations.
+- `compensation.minimum_base`: base-pay floor, or `null` to disable it.
+- `sources`: enabled job sources.
+
+Role families are config-driven. Built-in families are listed in `labor-sieve list-options`. `role_family_weights` also accepts custom snake_case keys, and the scorer applies those weights to matching `role_family` values from sources and presets.
+
+Bundled presets live in `presets/`. Downloaded presets live in `~/.config/labor-sieve/presets/` by default and override bundled presets with the same name.
+
+Update presets from this repository:
+
+```bash
+labor-sieve update-presets --index-url https://raw.githubusercontent.com/Deadrobot/Labor-Sieve/main/presets/index.json
+```
 
 Remote preset indexes use this shape:
 
@@ -106,14 +125,14 @@ Remote preset indexes use this shape:
     {
       "name": "linux-sre",
       "version": "2026.06.11",
-      "url": "https://example.com/labor-sieve/presets/linux-sre.yaml",
+      "url": "https://raw.githubusercontent.com/Deadrobot/Labor-Sieve/main/presets/linux-sre.yaml",
       "sha256": "hex-encoded-sha256"
     }
   ]
 }
 ```
 
-Use a preset:
+Apply a preset:
 
 ```bash
 labor-sieve list-presets
@@ -123,9 +142,9 @@ labor-sieve validate-config
 
 ## Sources
 
-Four sources exist now:
+Available sources:
 
-- `sample`: fake jobs for scoring/report smoke tests
+- `sample`: synthetic jobs for scoring/report smoke tests
 - `local_file`: local `.csv`, `.json`, `.yaml`, or `.yml` exports
 - `greenhouse`: public Greenhouse Job Board API boards
 - `lever`: public Lever Postings API companies
@@ -200,26 +219,120 @@ sources:
     base_url: https://api.lever.co/v0/postings
 ```
 
-## Distribution Notes
+## Manual Runs
 
-The simplest remote install path for Linux users is `pipx`:
-
-```bash
-python3 -m pip install --user pipx
-python3 -m pipx ensurepath
-pipx install labor-sieve
-labor-sieve quickstart
-```
-
-For a self-hosted archive or Git URL:
+Use a working directory that contains `config.yaml` and `output/`:
 
 ```bash
-curl -fsSL https://example.com/labor-sieve/install.sh | sh -s -- https://example.com/labor-sieve-0.1.0.tar.gz
+mkdir -p ~/labor-sieve
+cd ~/labor-sieve
+labor-sieve init
+nano config.yaml
+labor-sieve validate-config
+labor-sieve run
+less output/latest.txt
 ```
 
-The install script accepts any pip-compatible package spec, including a Git URL, wheel URL, or tarball URL. It uses `pipx` when available. If `pipx` is not installed, it creates a dedicated user venv at `~/.local/share/labor-sieve/venv` and symlinks `labor-sieve` into `~/.local/bin`.
+Subsequent runs from the same directory:
 
-Useful installer environment variables:
+```bash
+cd ~/labor-sieve
+labor-sieve run
+```
+
+Update the installed command from GitHub:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Deadrobot/Labor-Sieve/main/scripts/install.sh \
+  | sh -s -- git+https://github.com/Deadrobot/Labor-Sieve.git
+```
+
+## Scheduled Runs
+
+LaborSieve can run on a schedule with cron or a systemd user timer. Use one working directory so `config.yaml` and `output/` stay together.
+
+Cron example, every morning at 8:17:
+
+```bash
+mkdir -p ~/labor-sieve ~/.local/state/labor-sieve
+cd ~/labor-sieve
+labor-sieve init
+crontab -e
+```
+
+Add this crontab entry, changing paths as needed:
+
+```cron
+17 8 * * * cd "$HOME/labor-sieve" && "$HOME/.local/bin/labor-sieve" run >> "$HOME/.local/state/labor-sieve/run.log" 2>&1
+```
+
+systemd user timer example:
+
+```bash
+mkdir -p ~/.config/systemd/user ~/labor-sieve ~/.local/state/labor-sieve
+```
+
+Create `~/.config/systemd/user/labor-sieve.service`:
+
+```ini
+[Unit]
+Description=Run LaborSieve
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/labor-sieve
+ExecStart=%h/.local/bin/labor-sieve run
+StandardOutput=append:%h/.local/state/labor-sieve/run.log
+StandardError=append:%h/.local/state/labor-sieve/run.log
+```
+
+Create `~/.config/systemd/user/labor-sieve.timer`:
+
+```ini
+[Unit]
+Description=Run LaborSieve daily
+
+[Timer]
+OnCalendar=*-*-* 08:17:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+Enable and check it:
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now labor-sieve.timer
+systemctl --user list-timers labor-sieve.timer
+systemctl --user start labor-sieve.service
+```
+
+Enable lingering for scheduled user timers on systems that support it:
+
+```bash
+loginctl enable-linger "$USER"
+```
+
+## Distribution
+
+The installer accepts any pip-compatible package spec, including a Git URL, wheel path, wheel URL, or source archive URL. It uses `pipx` if pipx is installed. Otherwise, it creates a dedicated user venv at `~/.local/share/labor-sieve/venv` and symlinks `labor-sieve` into `~/.local/bin`.
+
+Install from GitHub:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Deadrobot/Labor-Sieve/main/scripts/install.sh \
+  | sh -s -- git+https://github.com/Deadrobot/Labor-Sieve.git
+```
+
+Install from a local wheel:
+
+```bash
+scripts/install.sh dist/labor_sieve-0.1.0-py3-none-any.whl
+```
+
+Installer environment variables:
 
 ```bash
 LABOR_SIEVE_INSTALL_MODE=venv     # force the dedicated venv path
@@ -227,18 +340,29 @@ LABOR_SIEVE_INSTALL_ROOT=...      # override ~/.local/share/labor-sieve
 LABOR_SIEVE_BIN_DIR=...           # override ~/.local/bin
 ```
 
-Self-hosting release archives from a home server is workable for a small trusted audience. A GitHub release or PyPI package is more standard when you want easier upgrades, checksums, and fewer install-support issues.
-
-Build a release locally:
+Build release artifacts:
 
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install -e ".[dev]"
+python3 scripts/build-preset-index.py
 scripts/build-release.sh
 ```
 
 The build script writes artifacts to `dist/` and prints SHA-256 checksums.
+
+## Maintainer Notes
+
+Add or tune role families in config and presets first. `role_family_weights` accepts custom snake_case keys, and presets can ship those weights without a code change.
+
+Source inference changes belong in `labor_sieve/sources/normalization.py`. Add tests when changing inferred `seniority`, `role_family`, compensation parsing, URL normalization, or source-specific field mapping.
+
+Regenerate the remote preset index when bundled presets change:
+
+```bash
+python3 scripts/build-preset-index.py
+```
 
 ## Local Testing
 
@@ -247,7 +371,7 @@ python -m compileall .
 python -m pytest
 ```
 
-If pytest is not installed:
+Install dev dependencies:
 
 ```bash
 python -m pip install -e ".[dev]"

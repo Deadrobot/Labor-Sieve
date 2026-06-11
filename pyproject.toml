@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "labor-sieve"
 version = "0.1.0"
-description = "Linux-first command-line job search and reporting for operations-adjacent workers."
+description = "Linux-first command-line job search and reporting for operations-adjacent roles."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -44,8 +44,10 @@ include = ["labor_sieve*"]
   "presets/logistics-process.yaml",
   "presets/implementation-support.yaml",
   "presets/senior-infra-lead.yaml",
+  "presets/index.json",
 ]
 "share/labor-sieve/scripts" = [
   "scripts/install.sh",
   "scripts/build-release.sh",
+  "scripts/build-preset-index.py",
 ]

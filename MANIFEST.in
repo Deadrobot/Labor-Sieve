@@ -3,5 +3,7 @@ include CHANGELOG.md
 include LICENSE
 include RELEASE.md
 include config.example.yaml
+include presets/index.json
 recursive-include presets *.yaml
 recursive-include scripts *.sh
+recursive-include scripts *.py

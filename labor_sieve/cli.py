@@ -375,6 +375,12 @@ def quickstart_text(config_path: Path) -> str:
             "  labor-sieve list-presets",
             f"  labor-sieve use-preset linux-sre -c {config_path}",
             "  labor-sieve list-options",
+            "",
+            "Scheduled run example:",
+            (
+                '  17 8 * * * cd "$HOME/labor-sieve" && "$HOME/.local/bin/labor-sieve" run '
+                '>> "$HOME/.local/state/labor-sieve/run.log" 2>&1'
+            ),
         ]
     )
 

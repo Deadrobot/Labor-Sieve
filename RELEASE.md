@@ -1,6 +1,6 @@
 # Release Checklist
 
-Use this for private pilot releases before publishing to PyPI.
+Use this checklist to build and verify release artifacts.
 
 ## Build
 
@@ -8,6 +8,7 @@ Use this for private pilot releases before publishing to PyPI.
 python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install -e ".[dev]"
+python scripts/build-preset-index.py
 scripts/build-release.sh
 ```
 
@@ -28,38 +29,64 @@ python -m venv /tmp/labor-sieve-release-test
 /tmp/labor-sieve-release-test/bin/labor-sieve validate-config -c /tmp/labor-sieve-config.yaml
 ```
 
-## Publish Options
+## Install Paths
 
 GitHub install:
 
 ```bash
-pipx install git+https://github.com/YOUR-USER/labor-sieve.git
+pipx install git+https://github.com/Deadrobot/Labor-Sieve.git
 ```
 
 GitHub install through the project installer:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/YOUR-USER/labor-sieve/main/scripts/install.sh \
-  | sh -s -- git+https://github.com/YOUR-USER/labor-sieve.git
+curl -fsSL https://raw.githubusercontent.com/Deadrobot/Labor-Sieve/main/scripts/install.sh \
+  | sh -s -- git+https://github.com/Deadrobot/Labor-Sieve.git
 ```
 
-GitHub Release or self-hosted wheel install:
+Local wheel install:
 
 ```bash
-pipx install https://example.com/labor-sieve/labor_sieve-0.1.0-py3-none-any.whl
+pipx install dist/labor_sieve-0.1.0-py3-none-any.whl
 ```
 
-Install script:
+Local wheel install through the project installer:
 
 ```bash
-curl -fsSL https://example.com/labor-sieve/install.sh \
-  | sh -s -- https://example.com/labor-sieve/labor_sieve-0.1.0-py3-none-any.whl
+scripts/install.sh dist/labor_sieve-0.1.0-py3-none-any.whl
 ```
 
-The installer uses `pipx` when available. Without `pipx`, it installs into a dedicated venv under `~/.local/share/labor-sieve/venv` and links `labor-sieve` into `~/.local/bin`.
+The installer uses `pipx` if pipx is installed. Otherwise, it installs into a dedicated venv under `~/.local/share/labor-sieve/venv` and links `labor-sieve` into `~/.local/bin`.
+
+## Preset Updates
+
+Remote preset updates use bundled preset files plus `presets/index.json`. Regenerate the index after files under `presets/*.yaml` change:
+
+```bash
+python scripts/build-preset-index.py
+```
+
+Users can update downloaded presets from GitHub:
+
+```bash
+labor-sieve update-presets --index-url https://raw.githubusercontent.com/Deadrobot/Labor-Sieve/main/presets/index.json
+```
+
+Role families can be added in presets by adding a snake_case key under `role_family_weights`. Source adapter inference changes belong in `labor_sieve/sources/normalization.py`.
+
+## Scheduling Smoke Test
+
+Verify the scheduled-run working directory command from a temporary directory:
+
+```bash
+mkdir -p /tmp/labor-sieve-schedule-test
+cd /tmp/labor-sieve-schedule-test
+labor-sieve init
+labor-sieve validate-config
+labor-sieve run
+```
 
 ## Notes
 
-- Keep GitHub releases private or limited until pilot feedback is incorporated.
-- Prefer GitHub Releases or a static host over ad hoc file sharing so checksums and rollback are clear.
-- Update `CHANGELOG.md` before every release.
+- Regenerate `presets/index.json` when bundled presets change.
+- Update `CHANGELOG.md` for each release artifact set.
