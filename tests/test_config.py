@@ -20,13 +20,21 @@ def test_example_config_is_valid():
     assert errors == []
     config = config_from_data(data)
     assert config.seniority.min == "mid"
-    assert config.sources.sample.enabled is True
+    assert config.sources.sample.enabled is False
     assert config.sources.local_file.enabled is False
-    assert config.sources.greenhouse.enabled is False
-    assert config.sources.lever.enabled is False
-    assert config.sources.ashby.enabled is False
-    assert config.sources.workday.enabled is False
+    assert config.sources.greenhouse.enabled is True
+    assert config.sources.lever.enabled is True
+    assert config.sources.ashby.enabled is True
+    assert config.sources.workday.enabled is True
+    assert config.sources.greenhouse.board_tokens == ["cloudflare", "canonical", "coreweave", "samsara"]
+    assert config.sources.lever.companies == ["palantir"]
+    assert config.sources.ashby.organizations == ["Lambda", "Crusoe", "Modal", "openai"]
     assert [site.company for site in config.sources.workday.sites] == ["NVIDIA", "Equinix", "Micron"]
+    assert config.sources.workday.max_jobs_per_site == 100
+    assert config.locations.local_region.center == "Richmond, VA"
+    assert config.locations.local_region.radius_miles == 40
+    assert "Richmond, VA" in config.locations.accepted_locations
+    assert "Petersburg, VA" in config.locations.accepted_locations
 
 
 def test_validation_reports_seniority_order_error():
@@ -117,6 +125,27 @@ def test_validation_requires_workday_site_url():
     errors = validate_config_data(data)
 
     assert "sources.workday.sites[0].url must be an https://*.myworkdayjobs.com URL." in errors
+
+
+def test_validation_accepts_legacy_hybrid_locations():
+    data = load_example()
+    data["locations"].pop("accepted_locations")
+    data["locations"]["hybrid_locations"] = ["Richmond, VA"]
+
+    errors = validate_config_data(data)
+    config = config_from_data(data)
+
+    assert errors == []
+    assert config.locations.accepted_locations == ["Richmond, VA"]
+
+
+def test_validation_reports_invalid_local_region_radius():
+    data = load_example()
+    data["locations"]["local_region"]["radius_miles"] = 0
+
+    errors = validate_config_data(data)
+
+    assert "locations.local_region.radius_miles must be a positive integer." in errors
 
 
 def test_init_config_does_not_overwrite_existing_file(tmp_path):

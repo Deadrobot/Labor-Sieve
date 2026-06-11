@@ -105,16 +105,28 @@ def _location_points(job: Job, config: Config, reasons: list[str]) -> float:
         reasons.append("remote role but remote is disabled; +0")
         return 0
 
-    if job.hybrid:
-        normalized_locations = [location.casefold() for location in config.locations.hybrid_locations]
-        if any(location in job.location.casefold() for location in normalized_locations):
-            reasons.append(f"hybrid location {job.location} accepted; +8")
+    local_region = (
+        f"{config.locations.local_region.center} "
+        f"within {config.locations.local_region.radius_miles} miles"
+    )
+    if _location_matches(job.location, config.locations.accepted_locations):
+        if job.hybrid:
+            reasons.append(f"hybrid location {job.location} accepted for {local_region}; +8")
             return 8
-        reasons.append(f"hybrid location {job.location} is not configured; +2")
+        reasons.append(f"local on-site location {job.location} accepted for {local_region}; +6")
+        return 6
+
+    if job.hybrid:
+        reasons.append(f"hybrid location {job.location} is not in accepted_locations; +2")
         return 2
 
-    reasons.append("on-site or unspecified location; +0")
+    reasons.append("on-site or unspecified location outside accepted_locations; +0")
     return 0
+
+
+def _location_matches(job_location: str, accepted_locations: list[str]) -> bool:
+    normalized_job_location = job_location.casefold()
+    return any(location.casefold() in normalized_job_location for location in accepted_locations)
 
 
 def _compensation_points(job: Job, config: Config, reasons: list[str]) -> float:

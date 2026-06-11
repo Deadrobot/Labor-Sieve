@@ -2,12 +2,17 @@
 
 ## Unreleased
 
+## 0.1.3
+
 - Make quickstart and install messages editor-neutral.
 - Clarify that `run` uses enabled sources from config.
 - Add Ashby as a public job board source.
 - Show source fetch progress with elapsed time during runs.
 - Add Workday as a public candidate experience source.
 - Include Workday starter company examples in the default config and quickstart guidance.
+- Center default local-region settings and sample jobs on Richmond, VA.
+- Make quickstart guidance call out the main config fields to edit before running.
+- Disable sample mode by default and enable verified public remote source starter lists.
 
 ## 0.1.2
 

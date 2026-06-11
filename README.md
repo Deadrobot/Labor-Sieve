@@ -105,11 +105,11 @@ labor-sieve run
 
 `labor-sieve use-preset PRESET` merges a preset into `config.yaml`, validates the result, and writes a `.bak` backup first.
 
-`labor-sieve run` uses enabled sources from the selected config file. The sample source is enabled by default so scoring and reports can be tested immediately.
+`labor-sieve run` uses enabled sources from the selected config file. The default config disables sample data and enables public remote sources with starter company lists.
 
 ## Configuration
 
-The default configuration prioritizes production operations, infrastructure, Linux/SRE, data center, logistics/process, and implementation-support roles.
+The default configuration prioritizes production operations, infrastructure, Linux/SRE, data center, logistics/process, and implementation-support roles around Richmond, VA. Public remote sources are enabled by default, so the first real run can take several minutes.
 
 Edit these fields in `config.yaml`:
 
@@ -117,13 +117,31 @@ Edit these fields in `config.yaml`:
 - `role_family_weights`: higher values increase priority for a role family.
 - `keywords.boost`: terms that improve a match.
 - `keywords.penalize`: terms that lower a match.
-- `locations`: remote support and acceptable hybrid locations.
+- `locations`: remote support, local-region notes, and accepted hybrid/on-site locations.
 - `compensation.minimum_base`: base-pay floor, or `null` to disable it.
 - `sources`: enabled job sources.
 
 Role families are config-driven. Built-in families are listed in `labor-sieve list-options`. `role_family_weights` also accepts custom snake_case keys, and the scorer applies those weights to matching `role_family` values from sources and presets.
 
 Bundled presets are included with the installed package and update when the package is upgraded from PyPI. Downloaded presets live in `~/.config/labor-sieve/presets/` by default and override bundled presets with the same name.
+
+### Location Settings
+
+The default config is centered on Richmond, VA with a 40-mile local-region note:
+
+```yaml
+locations:
+  remote: true
+  local_region:
+    center: Richmond, VA
+    radius_miles: 40
+  accepted_locations:
+    - Richmond, VA
+    - Henrico, VA
+    - Glen Allen, VA
+```
+
+`local_region.center` and `radius_miles` describe the intended search area. LaborSieve does not geocode locations; it matches job-posting location text against `accepted_locations`. To use another city, change the center/radius note and replace `accepted_locations` with nearby city, county, or metro strings that should count as local.
 
 Download remote presets from a hosted preset index:
 
@@ -165,7 +183,7 @@ Available sources:
 - `ashby`: public Ashby job board organizations
 - `workday`: public Workday candidate experience sites
 
-The default config includes a disabled Workday company list with starter examples for NVIDIA, Equinix, and Micron. To use it, set `sources.workday.enabled` to `true` and keep, remove, or add entries under `sources.workday.sites`.
+The default config disables sample data and enables starter lists for Greenhouse, Lever, Ashby, and Workday. `local_file` remains disabled until file paths are added.
 
 Example local file config:
 
@@ -196,7 +214,7 @@ sources:
     sites: []
     timeout_seconds: 20
     page_size: 20
-    max_jobs_per_site: 200
+    max_jobs_per_site: 100
 ```
 
 Local file records can include:
@@ -235,7 +253,7 @@ sources:
     sites: []
     timeout_seconds: 20
     page_size: 20
-    max_jobs_per_site: 200
+    max_jobs_per_site: 100
 ```
 
 Example Lever config:
@@ -267,7 +285,7 @@ sources:
     sites: []
     timeout_seconds: 20
     page_size: 20
-    max_jobs_per_site: 200
+    max_jobs_per_site: 100
 ```
 
 Example Ashby config:
@@ -299,7 +317,7 @@ sources:
     sites: []
     timeout_seconds: 20
     page_size: 20
-    max_jobs_per_site: 200
+    max_jobs_per_site: 100
 ```
 
 Example Workday config:
@@ -336,7 +354,7 @@ sources:
         url: https://micron.wd1.myworkdayjobs.com/External
     timeout_seconds: 20
     page_size: 20
-    max_jobs_per_site: 200
+    max_jobs_per_site: 100
 ```
 
 ## Manual Runs
@@ -353,7 +371,7 @@ less ~/labor-sieve/output/latest.txt
 
 The config file for this setup is `~/labor-sieve/config.yaml`. Default reports are written under `~/labor-sieve/output/`.
 
-For Workday scans, edit `~/labor-sieve/config.yaml`, review the company entries under `sources.workday.sites`, and set `sources.workday.enabled` to `true`.
+Review the enabled source lists before scheduled use. Workday entries are under `sources.workday.sites`; Greenhouse, Lever, and Ashby entries are under their matching source sections.
 
 Subsequent runs:
 

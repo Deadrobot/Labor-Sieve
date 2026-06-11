@@ -3,7 +3,8 @@ from pathlib import Path
 import yaml
 
 from labor_sieve.config import config_from_data
-from labor_sieve.scoring import priority_bucket, score_jobs
+from labor_sieve.models import Job
+from labor_sieve.scoring import priority_bucket, score_job, score_jobs
 from labor_sieve.sources.sample import SampleSource
 
 
@@ -39,3 +40,28 @@ def test_sample_jobs_exercise_expected_buckets():
     assert by_id["sample-software-001"].priority == "rejected"
     assert by_id["sample-executive-001"].priority == "rejected"
     assert by_id["sample-unknown-001"].priority == "rejected"
+
+
+def test_local_on_site_location_gets_region_credit():
+    config = load_config()
+    item = score_job(
+        Job(
+            id="local-onsite",
+            title="Data Center Operations Technician",
+            company="Example Data Center",
+            location="On-site - Petersburg, VA",
+            remote=False,
+            hybrid=False,
+            seniority="mid",
+            role_family="data_center_ops",
+            compensation_base_min=125000,
+            url="https://example.invalid/jobs/local-onsite",
+            description="Hardware diagnostics, Linux fleet support, and data center operations.",
+            tags=["data center", "hardware"],
+            source="test",
+            source_id="local-onsite",
+        ),
+        config,
+    )
+
+    assert any("local on-site location On-site - Petersburg, VA accepted" in reason for reason in item.reasons)

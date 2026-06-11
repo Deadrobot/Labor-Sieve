@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+import yaml
 
 from labor_sieve import __version__
 from labor_sieve.cli import fetch_source_with_status, main
@@ -31,10 +32,16 @@ def test_quickstart_prints_first_run_steps(tmp_path, monkeypatch, capsys):
     assert "Created" in output
     assert f"Config file: {expected_config}" in output
     assert "labor-sieve init -c" not in output
+    assert "Set location, seniority, remote/on-site, compensation, keywords, and sources." in output
     assert "Validate it: labor-sieve validate-config" in output
     assert "Run a scan: labor-sieve run" in output
+    assert "Public remote sources are enabled by default; sample data is disabled." in output
+    assert "locations.local_region" in output
+    assert "locations.accepted_locations" in output
+    assert "compensation.minimum_base" in output
     assert "sources.workday.sites" in output
-    assert "sources.workday.enabled" in output
+    assert "Review or edit the enabled Greenhouse, Lever, Ashby, and Workday source lists." in output
+    assert "Disable any source by setting that source's enabled field to false." in output
     assert f"labor-sieve validate-config -c {expected_config}" not in output
     assert str(expected_report) in output
 
@@ -92,7 +99,7 @@ def test_doctor_fails_when_config_is_missing(tmp_path, capsys):
 def test_run_writes_relative_output_next_to_config(tmp_path, monkeypatch):
     config_path = tmp_path / "project" / "config.yaml"
     config_path.parent.mkdir()
-    config_path.write_text((ROOT / "config.example.yaml").read_text(encoding="utf-8"), encoding="utf-8")
+    write_sample_only_config(config_path)
     other_dir = tmp_path / "other"
     other_dir.mkdir()
     monkeypatch.chdir(other_dir)
@@ -106,8 +113,9 @@ def test_run_writes_relative_output_next_to_config(tmp_path, monkeypatch):
 def test_run_uses_home_config_when_no_local_config_exists(tmp_path, monkeypatch, capsys):
     home = tmp_path / "home"
     monkeypatch.setenv("HOME", str(home))
-    assert main(["quickstart"]) == 0
-    capsys.readouterr()
+    config_path = home / "labor-sieve" / "config.yaml"
+    config_path.parent.mkdir(parents=True)
+    write_sample_only_config(config_path)
 
     other_dir = tmp_path / "other"
     other_dir.mkdir()
@@ -126,3 +134,12 @@ def test_fetch_source_with_status_prints_progress(capsys):
     assert jobs
     assert "Fetching sample..." in stderr
     assert "Fetching sample finished" in stderr
+
+
+def write_sample_only_config(path: Path) -> None:
+    data = yaml.safe_load((ROOT / "config.example.yaml").read_text(encoding="utf-8"))
+    for source_config in data["sources"].values():
+        if isinstance(source_config, dict) and "enabled" in source_config:
+            source_config["enabled"] = False
+    data["sources"]["sample"]["enabled"] = True
+    path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")

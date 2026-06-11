@@ -78,10 +78,30 @@ keywords:
 
 locations:
   remote: true
-  hybrid_locations:
-    - San Francisco Bay Area
-    - Seattle
-    - Austin
+  # Local region is documentation for the search area. LaborSieve does not
+  # geocode; edit accepted_locations to control which local postings match.
+  local_region:
+    center: Richmond, VA
+    radius_miles: 40
+  accepted_locations:
+    - Richmond, VA
+    - Henrico, VA
+    - Glen Allen, VA
+    - Short Pump, VA
+    - Mechanicsville, VA
+    - Ashland, VA
+    - Midlothian, VA
+    - Chesterfield, VA
+    - Chester, VA
+    - Colonial Heights, VA
+    - Petersburg, VA
+    - Hopewell, VA
+    - Powhatan, VA
+    - Goochland, VA
+    - Sandston, VA
+    - Highland Springs, VA
+    - Bon Air, VA
+    - Tuckahoe, VA
 
 compensation:
   minimum_base: 115000
@@ -95,30 +115,45 @@ output:
 
 sources:
   sample:
-    enabled: true
+    enabled: false
   local_file:
     enabled: false
     paths: []
   greenhouse:
-    enabled: false
-    board_tokens: []
+    enabled: true
+    board_tokens:
+      - cloudflare
+      - canonical
+      - coreweave
+      - samsara
     timeout_seconds: 20
   lever:
-    enabled: false
-    companies: []
+    enabled: true
+    companies:
+      - palantir
     timeout_seconds: 20
     base_url: https://api.lever.co/v0/postings
   ashby:
-    enabled: false
-    organizations: []
+    enabled: true
+    organizations:
+      - Lambda
+      - Crusoe
+      - Modal
+      - openai
     timeout_seconds: 20
     base_url: https://api.ashbyhq.com/posting-api/job-board
   workday:
-    enabled: false
-    sites: []
+    enabled: true
+    sites:
+      - company: NVIDIA
+        url: https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite
+      - company: Equinix
+        url: https://equinix.wd1.myworkdayjobs.com/External
+      - company: Micron
+        url: https://micron.wd1.myworkdayjobs.com/External
     timeout_seconds: 20
     page_size: 20
-    max_jobs_per_site: 200
+    max_jobs_per_site: 100
 """
 
 
@@ -145,9 +180,16 @@ class KeywordConfig:
 
 
 @dataclass(slots=True)
+class LocalRegionConfig:
+    center: str
+    radius_miles: int
+
+
+@dataclass(slots=True)
 class LocationConfig:
     remote: bool
-    hybrid_locations: list[str]
+    local_region: LocalRegionConfig
+    accepted_locations: list[str]
 
 
 @dataclass(slots=True)
@@ -344,7 +386,29 @@ def validate_config_data(data: dict[str, Any]) -> list[str]:
     locations = _require_mapping(data, "locations", errors)
     if locations is not None:
         _require_bool(locations, "remote", "locations.remote", errors)
-        _require_string_list(locations, "hybrid_locations", "locations.hybrid_locations", errors)
+        local_region = _optional_mapping(locations, "local_region", errors, label="locations.local_region")
+        if local_region is not None:
+            if not _is_string(local_region.get("center")):
+                errors.append("locations.local_region.center must be a non-empty string.")
+            radius = local_region.get("radius_miles")
+            if not isinstance(radius, int) or isinstance(radius, bool) or radius <= 0:
+                errors.append("locations.local_region.radius_miles must be a positive integer.")
+        if "accepted_locations" in locations:
+            _require_string_list(
+                locations,
+                "accepted_locations",
+                "locations.accepted_locations",
+                errors,
+            )
+        if "hybrid_locations" in locations:
+            _require_string_list(
+                locations,
+                "hybrid_locations",
+                "locations.hybrid_locations",
+                errors,
+            )
+        if "accepted_locations" not in locations and "hybrid_locations" not in locations:
+            errors.append("locations.accepted_locations must be a list of strings.")
 
     compensation = _require_mapping(data, "compensation", errors)
     if compensation is not None:
@@ -457,7 +521,11 @@ def config_from_data(data: dict[str, Any]) -> Config:
         ),
         locations=LocationConfig(
             remote=bool(locations["remote"]),
-            hybrid_locations=[str(value) for value in locations["hybrid_locations"]],
+            local_region=LocalRegionConfig(
+                center=str(locations.get("local_region", {}).get("center", "Richmond, VA")),
+                radius_miles=int(locations.get("local_region", {}).get("radius_miles", 40)),
+            ),
+            accepted_locations=_location_strings(locations),
         ),
         compensation=CompensationConfig(
             minimum_base=(
@@ -504,7 +572,7 @@ def config_from_data(data: dict[str, Any]) -> Config:
                 ],
                 timeout_seconds=int(workday.get("timeout_seconds", 20)),
                 page_size=int(workday.get("page_size", 20)),
-                max_jobs_per_site=int(workday.get("max_jobs_per_site", 200)),
+                max_jobs_per_site=int(workday.get("max_jobs_per_site", 100)),
             ),
         ),
     )
@@ -521,6 +589,27 @@ def built_in_options_text() -> str:
         "Custom snake_case role_family_weights are valid.",
     ]
     return "\n".join(lines)
+
+
+def _location_strings(locations: dict[str, Any]) -> list[str]:
+    values = []
+    for key in ("accepted_locations", "hybrid_locations"):
+        raw_values = locations.get(key, [])
+        if isinstance(raw_values, list):
+            values.extend(str(value) for value in raw_values)
+    return _dedupe_strings(values)
+
+
+def _dedupe_strings(values: list[str]) -> list[str]:
+    deduped = []
+    seen = set()
+    for value in values:
+        text = str(value).strip()
+        key = text.casefold()
+        if text and key not in seen:
+            seen.add(key)
+            deduped.append(text)
+    return deduped
 
 
 def _require_mapping(

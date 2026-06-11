@@ -58,10 +58,32 @@ keywords:
 
 locations:
   remote: true
-  hybrid_locations:
-    - San Francisco Bay Area
-    - Seattle
-    - Austin
+  # Local region is documentation for the search area. LaborSieve does not
+  # geocode; edit accepted_locations to control which local postings match.
+  local_region:
+    center: Richmond, VA
+    radius_miles: 40
+  # Add, remove, or replace city/state strings for hybrid and on-site postings.
+  # If you change local_region.center or radius_miles, update this list too.
+  accepted_locations:
+    - Richmond, VA
+    - Henrico, VA
+    - Glen Allen, VA
+    - Short Pump, VA
+    - Mechanicsville, VA
+    - Ashland, VA
+    - Midlothian, VA
+    - Chesterfield, VA
+    - Chester, VA
+    - Colonial Heights, VA
+    - Petersburg, VA
+    - Hopewell, VA
+    - Powhatan, VA
+    - Goochland, VA
+    - Sandston, VA
+    - Highland Springs, VA
+    - Bon Air, VA
+    - Tuckahoe, VA
 
 compensation:
   minimum_base: 115000
@@ -74,8 +96,9 @@ output:
   html: true
 
 sources:
+  # Synthetic local sample data is disabled by default so normal runs use live sources.
   sample:
-    enabled: true
+    enabled: false
   # Load jobs from local exports.
   # Supported file types: .csv, .json, .yaml, .yml
   # Records may include title, company, location, remote, hybrid, seniority,
@@ -86,29 +109,38 @@ sources:
   # Public Greenhouse Job Board API source. Use board tokens from URLs like:
   # https://boards.greenhouse.io/{board_token}
   greenhouse:
-    enabled: false
-    board_tokens: []
+    enabled: true
+    board_tokens:
+      - cloudflare
+      - canonical
+      - coreweave
+      - samsara
     timeout_seconds: 20
   # Public Lever Postings API source. Use company names from URLs like:
   # https://jobs.lever.co/{company}
   lever:
-    enabled: false
-    companies: []
+    enabled: true
+    companies:
+      - palantir
     timeout_seconds: 20
     base_url: https://api.lever.co/v0/postings
   # Public Ashby Job Posting API source. Use organization names from URLs like:
   # https://jobs.ashbyhq.com/{organization}
   ashby:
-    enabled: false
-    organizations: []
+    enabled: true
+    organizations:
+      - Lambda
+      - Crusoe
+      - Modal
+      - openai
     timeout_seconds: 20
     base_url: https://api.ashbyhq.com/posting-api/job-board
   # Public Workday candidate experience source. Use career site URLs like:
   # https://example.wd5.myworkdayjobs.com/ExampleExternalCareerSite
-  # Workday checks only the company sites listed here after enabled is true.
+  # Workday checks only the company sites listed here.
   # Keep, remove, or add entries based on the companies you want to scan.
   workday:
-    enabled: false
+    enabled: true
     sites:
       - company: NVIDIA
         url: https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite
@@ -118,4 +150,4 @@ sources:
         url: https://micron.wd1.myworkdayjobs.com/External
     timeout_seconds: 20
     page_size: 20
-    max_jobs_per_site: 200
+    max_jobs_per_site: 100
