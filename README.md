@@ -19,11 +19,19 @@ Install the published command on a Linux machine:
 pipx install labor-sieve
 ```
 
-If `pipx` is not available, use the tagged project installer:
+If `pipx` is not installed:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Deadrobot/Labor-Sieve/v0.1.0/scripts/install.sh \
-  | sh -s -- labor-sieve==0.1.0
+# Debian/Ubuntu
+sudo apt install pipx
+
+# Fedora
+sudo dnf install pipx
+
+# Arch
+sudo pacman -S python-pipx
+
+pipx ensurepath
 ```
 
 Create a working directory, configure preferences, and run a scan:
@@ -78,7 +86,7 @@ labor-sieve doctor
 labor-sieve validate-config
 labor-sieve list-options
 labor-sieve list-presets
-labor-sieve update-presets --index-url https://raw.githubusercontent.com/Deadrobot/Labor-Sieve/main/presets/index.json
+labor-sieve update-presets --index-url PRESET_INDEX_URL
 labor-sieve use-preset linux-sre
 labor-sieve run
 ```
@@ -117,12 +125,12 @@ Edit these fields in `config.yaml`:
 
 Role families are config-driven. Built-in families are listed in `labor-sieve list-options`. `role_family_weights` also accepts custom snake_case keys, and the scorer applies those weights to matching `role_family` values from sources and presets.
 
-Bundled presets live in `presets/`. Downloaded presets live in `~/.config/labor-sieve/presets/` by default and override bundled presets with the same name.
+Bundled presets are included with the installed package and update when the package is upgraded from PyPI. Downloaded presets live in `~/.config/labor-sieve/presets/` by default and override bundled presets with the same name.
 
-Update presets from this repository:
+Download remote presets from a hosted preset index:
 
 ```bash
-labor-sieve update-presets --index-url https://raw.githubusercontent.com/Deadrobot/Labor-Sieve/main/presets/index.json
+labor-sieve update-presets --index-url https://example.com/labor-sieve/presets/index.json
 ```
 
 Remote preset indexes use this shape:
@@ -133,7 +141,7 @@ Remote preset indexes use this shape:
     {
       "name": "linux-sre",
       "version": "2026.06.11",
-      "url": "https://raw.githubusercontent.com/Deadrobot/Labor-Sieve/main/presets/linux-sre.yaml",
+      "url": "https://example.com/labor-sieve/presets/linux-sre.yaml",
       "sha256": "hex-encoded-sha256"
     }
   ]
@@ -256,13 +264,6 @@ Update the installed command from PyPI:
 pipx upgrade labor-sieve
 ```
 
-If the tagged project installer was used:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/Deadrobot/Labor-Sieve/v0.1.0/scripts/install.sh \
-  | sh -s -- labor-sieve==0.1.0
-```
-
 ## Scheduled Runs
 
 LaborSieve can run on a schedule with cron or a systemd user timer. Use one working directory so `config.yaml` and `output/` stay together.
@@ -333,7 +334,7 @@ loginctl enable-linger "$USER"
 
 ## Distribution
 
-The installer accepts any pip-compatible package spec, including a package version, wheel path, wheel URL, or source archive URL. It uses `pipx` if pipx is installed. Otherwise, it creates a dedicated user venv at `~/.local/share/labor-sieve/venv` and symlinks `labor-sieve` into `~/.local/bin`.
+Public installs use the PyPI package through `pipx`. On Debian and Ubuntu systems, plain `pip install --user labor-sieve` can be blocked by the system Python package policy; `pipx` creates an isolated application environment and exposes the `labor-sieve` command.
 
 Install from PyPI:
 
@@ -341,14 +342,13 @@ Install from PyPI:
 pipx install labor-sieve
 ```
 
-Install from PyPI through the tagged project installer:
+Upgrade from PyPI:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Deadrobot/Labor-Sieve/v0.1.0/scripts/install.sh \
-  | sh -s -- labor-sieve==0.1.0
+pipx upgrade labor-sieve
 ```
 
-Install from a local wheel:
+The local installer script is for maintainer testing from an accessible checkout or local wheel:
 
 ```bash
 scripts/install.sh dist/labor_sieve-0.1.0-py3-none-any.whl
@@ -368,7 +368,6 @@ Build release artifacts:
 python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install -e ".[dev]"
-python3 scripts/build-preset-index.py
 scripts/build-release.sh
 python -m twine check dist/*
 ```
@@ -381,10 +380,10 @@ Add or tune role families in config and presets first. `role_family_weights` acc
 
 Source inference changes belong in `labor_sieve/sources/normalization.py`. Add tests when changing inferred `seniority`, `role_family`, compensation parsing, URL normalization, or source-specific field mapping.
 
-Regenerate the remote preset index when bundled presets change:
+Bundled preset changes ship in the PyPI package. A remote preset index requires a public HTTPS file host for the preset YAML files:
 
 ```bash
-python3 scripts/build-preset-index.py
+python3 scripts/build-preset-index.py --base-url https://example.com/labor-sieve/presets
 ```
 
 ## Local Testing

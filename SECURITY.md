@@ -6,7 +6,7 @@ The current supported version line is `0.1.x`.
 
 ## Reporting A Vulnerability
 
-Use GitHub private vulnerability reporting for this repository when available. If private reporting is not available, open a GitHub issue titled `Security contact request` without exploit details, private data, or sensitive logs.
+Use the repository's private vulnerability reporting channel if you have repository access. If you do not have repository access, contact the package maintainer through the PyPI project contact channel without exploit details, private data, or sensitive logs.
 
 Include:
 

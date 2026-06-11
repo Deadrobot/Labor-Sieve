@@ -1,6 +1,17 @@
 # Release Checklist
 
-Use this checklist to build and verify release artifacts.
+Use this checklist when publishing a new LaborSieve package version.
+
+## Version
+
+Pick the next version before building. PyPI package versions are immutable; never reuse a version after it has been uploaded.
+
+Update both files:
+
+- `pyproject.toml`: `[project] version`
+- `labor_sieve/__init__.py`: `__version__`
+
+Move completed entries from `CHANGELOG.md` `Unreleased` into a versioned section.
 
 ## Build
 
@@ -8,7 +19,6 @@ Use this checklist to build and verify release artifacts.
 python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install -e ".[dev]"
-python scripts/build-preset-index.py
 scripts/build-release.sh
 python -m twine check dist/*
 ```
@@ -19,11 +29,11 @@ The build script uses the active dev environment with `python -m build --no-isol
 ## Verify
 
 ```bash
-python -m compileall .
+python -m compileall labor_sieve tests
 python -m pytest
 
 python -m venv /tmp/labor-sieve-release-test
-/tmp/labor-sieve-release-test/bin/python -m pip install dist/labor_sieve-0.1.0-py3-none-any.whl
+/tmp/labor-sieve-release-test/bin/python -m pip install dist/labor_sieve-0.1.1-py3-none-any.whl
 /tmp/labor-sieve-release-test/bin/labor-sieve --version
 /tmp/labor-sieve-release-test/bin/labor-sieve quickstart
 /tmp/labor-sieve-release-test/bin/labor-sieve init -c /tmp/labor-sieve-config.yaml
@@ -31,47 +41,46 @@ python -m venv /tmp/labor-sieve-release-test
 /tmp/labor-sieve-release-test/bin/labor-sieve run -c /tmp/labor-sieve-config.yaml
 ```
 
+Replace `0.1.1` with the version being released.
+
 ## Install Paths
 
-PyPI install:
+Public install from PyPI:
 
 ```bash
 pipx install labor-sieve
 ```
 
-Tagged project installer:
+Public upgrade from PyPI:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Deadrobot/Labor-Sieve/v0.1.0/scripts/install.sh \
-  | sh -s -- labor-sieve==0.1.0
+pipx upgrade labor-sieve
 ```
 
-Local wheel install:
+Local wheel install for release testing:
 
 ```bash
-pipx install dist/labor_sieve-0.1.0-py3-none-any.whl
+pipx install dist/labor_sieve-0.1.1-py3-none-any.whl
 ```
 
 Local wheel install through the project installer:
 
 ```bash
-scripts/install.sh dist/labor_sieve-0.1.0-py3-none-any.whl
+scripts/install.sh dist/labor_sieve-0.1.1-py3-none-any.whl
 ```
 
-The installer uses `pipx` if pipx is installed. Otherwise, it installs into a dedicated venv under `~/.local/share/labor-sieve/venv` and links `labor-sieve` into `~/.local/bin`.
+The repository installer script is for accessible checkouts and local artifacts. Public install instructions should use PyPI and `pipx`.
 
 ## Preset Updates
 
-Remote preset updates use bundled preset files plus `presets/index.json`. Regenerate the index after files under `presets/*.yaml` change:
+Bundled preset changes ship through the PyPI package release.
+
+`labor-sieve update-presets` also supports a remote preset index, but the index and preset YAML files must be hosted at public HTTPS URLs. Do not publish preset indexes that point to private repository raw URLs.
+
+Regenerate an index only when a public preset host is available:
 
 ```bash
-python scripts/build-preset-index.py
-```
-
-Users can update downloaded presets from GitHub:
-
-```bash
-labor-sieve update-presets --index-url https://raw.githubusercontent.com/Deadrobot/Labor-Sieve/main/presets/index.json
+python scripts/build-preset-index.py --base-url https://example.com/labor-sieve/presets
 ```
 
 Role families can be added in presets by adding a snake_case key under `role_family_weights`. Source adapter inference changes belong in `labor_sieve/sources/normalization.py`.
@@ -90,12 +99,15 @@ labor-sieve run
 
 ## Publish
 
-Publish from a clean working tree after the verification commands pass:
+Publish from a clean working tree after verification passes. Replace `0.1.1` with the release version.
 
 ```bash
-git tag v0.1.0
+git status --short
+git add .
+git commit -m "Prepare LaborSieve 0.1.1 release"
+git tag v0.1.1
 git push origin main
-git push origin v0.1.0
+git push origin v0.1.1
 python -m twine upload dist/*
 ```
 
@@ -103,11 +115,13 @@ After PyPI upload, verify the published package from a fresh environment:
 
 ```bash
 python -m venv /tmp/labor-sieve-pypi-test
-/tmp/labor-sieve-pypi-test/bin/python -m pip install labor-sieve
+/tmp/labor-sieve-pypi-test/bin/python -m pip install --no-cache-dir labor-sieve==0.1.1
 /tmp/labor-sieve-pypi-test/bin/labor-sieve --version
+/tmp/labor-sieve-pypi-test/bin/labor-sieve quickstart
 ```
 
 ## Notes
 
-- Regenerate `presets/index.json` when bundled presets change.
-- Update `CHANGELOG.md` for each release artifact set.
+- Git updates alone do not update the public package. Public users receive code changes after a new version is uploaded to PyPI.
+- `pipx upgrade labor-sieve` updates an installed command to the newest PyPI release.
+- If files change after building `dist/`, rerun `scripts/build-release.sh` before uploading.

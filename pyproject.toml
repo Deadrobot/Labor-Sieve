@@ -29,13 +29,6 @@ classifiers = [
   "Topic :: Utilities",
 ]
 
-[project.urls]
-Homepage = "https://github.com/Deadrobot/Labor-Sieve"
-Repository = "https://github.com/Deadrobot/Labor-Sieve"
-Issues = "https://github.com/Deadrobot/Labor-Sieve/issues"
-Changelog = "https://github.com/Deadrobot/Labor-Sieve/blob/main/CHANGELOG.md"
-Security = "https://github.com/Deadrobot/Labor-Sieve/blob/main/SECURITY.md"
-
 [project.optional-dependencies]
 dev = [
   "build>=1.2",
@@ -66,7 +59,6 @@ include = ["labor_sieve*"]
   "presets/logistics-process.yaml",
   "presets/implementation-support.yaml",
   "presets/senior-infra-lead.yaml",
-  "presets/index.json",
 ]
 "share/labor-sieve/scripts" = [
   "scripts/install.sh",

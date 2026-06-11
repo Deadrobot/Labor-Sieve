@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the remote preset index used by labor-sieve update-presets."""
+"""Build a remote preset index for labor-sieve update-presets."""
 
 from __future__ import annotations
 
@@ -9,7 +9,6 @@ import json
 from pathlib import Path
 
 
-DEFAULT_BASE_URL = "https://raw.githubusercontent.com/Deadrobot/Labor-Sieve/main/presets"
 DEFAULT_PRESET_DIR = Path("presets")
 DEFAULT_OUTPUT = DEFAULT_PRESET_DIR / "index.json"
 
@@ -18,12 +17,18 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Generate presets/index.json.")
     parser.add_argument("--preset-dir", default=str(DEFAULT_PRESET_DIR), help="Directory containing preset YAML files.")
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT), help="Index JSON path to write.")
-    parser.add_argument("--base-url", default=DEFAULT_BASE_URL, help="Base URL where preset YAML files are hosted.")
+    parser.add_argument(
+        "--base-url",
+        required=True,
+        help="Public HTTPS base URL where preset YAML files are hosted.",
+    )
     args = parser.parse_args()
 
     preset_dir = Path(args.preset_dir)
     output = Path(args.output)
     base_url = str(args.base_url).rstrip("/")
+    if not base_url.startswith("https://"):
+        raise SystemExit("--base-url must start with https://")
 
     entries = []
     for path in sorted(preset_dir.glob("*.yaml")):

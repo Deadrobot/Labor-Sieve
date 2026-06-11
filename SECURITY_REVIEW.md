@@ -124,4 +124,10 @@ The focused tests cover CSV formula neutralization, oversized preset downloads, 
 
 The review found no daemon, database, credential store, background service, reverse proxy, shell-evaluation path, unsafe YAML loader, unsafe HTML rendering path, or arbitrary filesystem write through presets.
 
+Publication hardening update on 2026-06-11:
+
+- Public install and upgrade documentation now uses the PyPI package through `pipx`.
+- Private GitHub raw URLs were removed from public install instructions, package metadata, and the tracked remote preset index.
+- Remote preset index generation now requires an explicit public HTTPS base URL.
+
 Keep this file current when findings are fixed or when new source adapters, report formats, install paths, or preset update behavior are added.
