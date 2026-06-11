@@ -13,11 +13,17 @@ Current scope:
 
 ## Quick Start
 
-Install from GitHub on a Linux machine:
+Install the published command on a Linux machine:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Deadrobot/Labor-Sieve/main/scripts/install.sh \
-  | sh -s -- git+https://github.com/Deadrobot/Labor-Sieve.git
+pipx install labor-sieve
+```
+
+If `pipx` is not available, use the tagged project installer:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Deadrobot/Labor-Sieve/v0.1.0/scripts/install.sh \
+  | sh -s -- labor-sieve==0.1.0
 ```
 
 Create a working directory, configure preferences, and run a scan:
@@ -240,11 +246,17 @@ cd ~/labor-sieve
 labor-sieve run
 ```
 
-Update the installed command from GitHub:
+Update the installed command from PyPI:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Deadrobot/Labor-Sieve/main/scripts/install.sh \
-  | sh -s -- git+https://github.com/Deadrobot/Labor-Sieve.git
+pipx upgrade labor-sieve
+```
+
+If the tagged project installer was used:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Deadrobot/Labor-Sieve/v0.1.0/scripts/install.sh \
+  | sh -s -- labor-sieve==0.1.0
 ```
 
 ## Scheduled Runs
@@ -317,13 +329,19 @@ loginctl enable-linger "$USER"
 
 ## Distribution
 
-The installer accepts any pip-compatible package spec, including a Git URL, wheel path, wheel URL, or source archive URL. It uses `pipx` if pipx is installed. Otherwise, it creates a dedicated user venv at `~/.local/share/labor-sieve/venv` and symlinks `labor-sieve` into `~/.local/bin`.
+The installer accepts any pip-compatible package spec, including a package version, wheel path, wheel URL, or source archive URL. It uses `pipx` if pipx is installed. Otherwise, it creates a dedicated user venv at `~/.local/share/labor-sieve/venv` and symlinks `labor-sieve` into `~/.local/bin`.
 
-Install from GitHub:
+Install from PyPI:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Deadrobot/Labor-Sieve/main/scripts/install.sh \
-  | sh -s -- git+https://github.com/Deadrobot/Labor-Sieve.git
+pipx install labor-sieve
+```
+
+Install from PyPI through the tagged project installer:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Deadrobot/Labor-Sieve/v0.1.0/scripts/install.sh \
+  | sh -s -- labor-sieve==0.1.0
 ```
 
 Install from a local wheel:
@@ -348,6 +366,7 @@ python3 -m venv .venv
 python -m pip install -e ".[dev]"
 python3 scripts/build-preset-index.py
 scripts/build-release.sh
+python -m twine check dist/*
 ```
 
 The build script writes artifacts to `dist/` and prints SHA-256 checksums.

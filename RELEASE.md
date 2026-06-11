@@ -10,6 +10,7 @@ python3 -m venv .venv
 python -m pip install -e ".[dev]"
 python scripts/build-preset-index.py
 scripts/build-release.sh
+python -m twine check dist/*
 ```
 
 Artifacts are written to `dist/`.
@@ -27,21 +28,22 @@ python -m venv /tmp/labor-sieve-release-test
 /tmp/labor-sieve-release-test/bin/labor-sieve quickstart
 /tmp/labor-sieve-release-test/bin/labor-sieve init -c /tmp/labor-sieve-config.yaml
 /tmp/labor-sieve-release-test/bin/labor-sieve validate-config -c /tmp/labor-sieve-config.yaml
+/tmp/labor-sieve-release-test/bin/labor-sieve run -c /tmp/labor-sieve-config.yaml
 ```
 
 ## Install Paths
 
-GitHub install:
+PyPI install:
 
 ```bash
-pipx install git+https://github.com/Deadrobot/Labor-Sieve.git
+pipx install labor-sieve
 ```
 
-GitHub install through the project installer:
+Tagged project installer:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Deadrobot/Labor-Sieve/main/scripts/install.sh \
-  | sh -s -- git+https://github.com/Deadrobot/Labor-Sieve.git
+curl -fsSL https://raw.githubusercontent.com/Deadrobot/Labor-Sieve/v0.1.0/scripts/install.sh \
+  | sh -s -- labor-sieve==0.1.0
 ```
 
 Local wheel install:
@@ -84,6 +86,25 @@ cd /tmp/labor-sieve-schedule-test
 labor-sieve init
 labor-sieve validate-config
 labor-sieve run
+```
+
+## Publish
+
+Publish from a clean working tree after the verification commands pass:
+
+```bash
+git tag v0.1.0
+git push origin main
+git push origin v0.1.0
+python -m twine upload dist/*
+```
+
+After PyPI upload, verify the published package from a fresh environment:
+
+```bash
+python -m venv /tmp/labor-sieve-pypi-test
+/tmp/labor-sieve-pypi-test/bin/python -m pip install labor-sieve
+/tmp/labor-sieve-pypi-test/bin/labor-sieve --version
 ```
 
 ## Notes

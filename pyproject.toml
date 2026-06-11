@@ -16,12 +16,32 @@ authors = [
 ]
 license = "MIT"
 keywords = ["jobs", "cli", "sre", "operations", "linux"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: End Users/Desktop",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Office/Business",
+  "Topic :: Utilities",
+]
+
+[project.urls]
+Homepage = "https://github.com/Deadrobot/Labor-Sieve"
+Repository = "https://github.com/Deadrobot/Labor-Sieve"
+Issues = "https://github.com/Deadrobot/Labor-Sieve/issues"
+Changelog = "https://github.com/Deadrobot/Labor-Sieve/blob/main/CHANGELOG.md"
+Security = "https://github.com/Deadrobot/Labor-Sieve/blob/main/SECURITY.md"
 
 [project.optional-dependencies]
 dev = [
   "build>=1.2",
   "pytest>=8.0",
   "setuptools>=68",
+  "twine>=6.0",
 ]
 
 [project.scripts]
@@ -36,6 +56,8 @@ include = ["labor_sieve*"]
 [tool.setuptools.data-files]
 "share/labor-sieve" = [
   "config.example.yaml",
+  "SECURITY.md",
+  "SECURITY_REVIEW.md",
 ]
 "share/labor-sieve/presets" = [
   "presets/operations-engineer.yaml",
