@@ -52,7 +52,12 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command")
 
     config_parent = argparse.ArgumentParser(add_help=False)
-    config_parent.add_argument("-c", "--config", default="config.yaml", help="Path to config.yaml")
+    config_parent.add_argument(
+        "-c",
+        "--config",
+        default=None,
+        help="Path to config.yaml (default: ./config.yaml if present, otherwise ~/labor-sieve/config.yaml)",
+    )
 
     init_parser = subparsers.add_parser("init", parents=[config_parent], help="Create config.yaml")
     init_parser.set_defaults(func=cmd_init)
@@ -60,7 +65,7 @@ def build_parser() -> argparse.ArgumentParser:
     quickstart_parser = subparsers.add_parser(
         "quickstart",
         parents=[config_parent],
-        help="Print first-run setup instructions",
+        help="Create default config if missing and print setup instructions",
     )
     quickstart_parser.set_defaults(func=cmd_quickstart)
 
@@ -129,7 +134,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def cmd_init(args: argparse.Namespace) -> int:
-    config_path = Path(args.config).expanduser()
+    config_path = resolve_config_path(args.config)
     try:
         print(init_config(config_path))
     except ConfigError as exc:
@@ -141,17 +146,23 @@ def cmd_init(args: argparse.Namespace) -> int:
 
 
 def cmd_quickstart(args: argparse.Namespace) -> int:
-    if args.config == "config.yaml":
-        config_path = Path.home() / "labor-sieve" / "config.yaml"
+    config_path = _absolute_path(resolve_config_path(args.config))
+    if not config_path.exists():
+        try:
+            print(init_config(config_path))
+        except ConfigError as exc:
+            print_errors(exc.errors)
+            return 1
+        print()
+        print(quickstart_text(config_path, include_create=False))
     else:
-        config_path = Path(args.config).expanduser()
-    print(quickstart_text(config_path, include_create=True))
+        print(quickstart_text(config_path, include_create=True))
     return 0
 
 
 def cmd_doctor(args: argparse.Namespace) -> int:
     checks: list[tuple[str, bool, str]] = []
-    config_path = Path(args.config)
+    config_path = resolve_config_path(args.config)
 
     checks.append(
         (
@@ -201,7 +212,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             config = load_config(config_path)
             enabled = [source.name for source in enabled_sources(config)]
             checks.append(("Enabled sources", bool(enabled), ", ".join(enabled) if enabled else "none enabled"))
-            output_dir = Path(config.output.directory)
+            output_dir = resolve_output_dir(config, config_path)
             parent = output_dir.parent if output_dir.parent != Path("") else Path(".")
             checks.append(("Output parent", parent.exists(), str(parent)))
         except ConfigError as exc:
@@ -215,7 +226,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
 
 def cmd_validate_config(args: argparse.Namespace) -> int:
-    path = Path(args.config)
+    path = resolve_config_path(args.config)
     try:
         data = read_yaml_file(path)
     except ConfigError as exc:
@@ -238,8 +249,9 @@ def cmd_list_options(args: argparse.Namespace) -> int:
 
 
 def cmd_run(args: argparse.Namespace) -> int:
+    config_path = resolve_config_path(args.config)
     try:
-        config = load_config(Path(args.config))
+        config = load_config(config_path)
     except ConfigError as exc:
         print_errors(exc.errors)
         return 1
@@ -255,7 +267,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     jobs, duplicate_count = dedupe_jobs(jobs)
     scored = score_jobs(jobs, config)
     try:
-        written = write_reports(scored, config)
+        written = write_reports(scored, config, base_dir=_absolute_path(config_path).parent)
     except OSError as exc:
         print_errors([f"Reports could not be written: {exc}"])
         return 1
@@ -313,7 +325,7 @@ def cmd_use_preset(args: argparse.Namespace) -> int:
     try:
         config_path, backup_path = apply_preset_to_config(
             args.preset,
-            Path(args.config),
+            resolve_config_path(args.config),
             preset_dir=_optional_path(args.preset_dir),
         )
     except (ConfigError, PresetError) as exc:
@@ -365,6 +377,26 @@ def print_errors(errors: list[str]) -> None:
         print(f"  - {error}", file=sys.stderr)
 
 
+def default_config_path() -> Path:
+    return Path.home() / "labor-sieve" / "config.yaml"
+
+
+def resolve_config_path(value: str | None) -> Path:
+    if value is not None:
+        return Path(value).expanduser()
+    local_config = Path("config.yaml")
+    if local_config.exists():
+        return local_config
+    return default_config_path()
+
+
+def resolve_output_dir(config: Config, config_path: Path) -> Path:
+    output_dir = Path(config.output.directory).expanduser()
+    if output_dir.is_absolute():
+        return output_dir
+    return _absolute_path(config_path).parent / output_dir
+
+
 def _optional_path(value: str | None) -> Path | None:
     if value is None:
         return None
@@ -387,7 +419,7 @@ def quickstart_text(config_path: Path, *, include_create: bool) -> str:
         "",
     ]
 
-    if include_create:
+    if include_create and not config_path.exists():
         lines.extend(
             [
                 "Create the config file with the default commented settings:",
@@ -397,33 +429,23 @@ def quickstart_text(config_path: Path, *, include_create: bool) -> str:
                 "",
             ]
         )
-    else:
-        lines.extend(
-            [
-                "Config file:",
-                f"  {config_path} now contains the default commented settings.",
-                "",
-            ]
-        )
-
     lines.extend(
         [
             "Next steps:",
-            f"  1. Edit the config file: ${{EDITOR:-nano}} {_quote(config_name)}",
-            f"  2. Validate it: labor-sieve validate-config -c {_quote(config_name)}",
-            f"  3. Run a scan from the working directory: labor-sieve run -c {_quote(config_name)}",
+            f"  1. Edit the config file: ${{EDITOR:-nano}} {_quote(config_path)}",
+            f"  2. Validate it: labor-sieve validate-config -c {_quote(config_path)}",
+            f"  3. Run a scan: labor-sieve run -c {_quote(config_path)}",
             f"  4. Read the text report: {_quote(str(output_dir / 'latest.txt'))}",
             "",
             "Useful setup commands:",
             "  labor-sieve list-presets",
-            f"  labor-sieve use-preset linux-sre -c {_quote(config_name)}",
+            f"  labor-sieve use-preset linux-sre -c {_quote(config_path)}",
             "  labor-sieve list-options",
             "",
             "Scheduled run example:",
             (
-                f"  17 8 * * * cd {_quote(work_dir)} && "
-                f"{_quote(str(Path.home() / '.local' / 'bin' / 'labor-sieve'))} run "
-                f"-c {_quote(config_name)} >> "
+                f"  17 8 * * * {_quote(str(Path.home() / '.local' / 'bin' / 'labor-sieve'))} run "
+                f"-c {_quote(config_path)} >> "
                 f"{_quote(str(Path.home() / '.local' / 'state' / 'labor-sieve' / 'run.log'))} 2>&1"
             ),
         ]

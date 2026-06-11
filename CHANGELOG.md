@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Hide first-run config creation commands when the target config file already exists.
+- Create the default config from `labor-sieve quickstart` and write reports beside explicit config paths.
+
 ## 0.1.1
 
 - Clarify first-run and post-install setup messages with explicit working directory, config path, report path, and config creation command.

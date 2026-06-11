@@ -18,7 +18,7 @@ except ImportError:  # pragma: no cover - exercised only in missing dependency i
 
 
 DEFAULT_CONFIG_EXAMPLE = """# LaborSieve configuration.
-# Copy this file to config.yaml with: labor-sieve init
+# Created by labor-sieve quickstart or labor-sieve init.
 
 # Ordered seniority values:
 # entry, junior, mid, senior, staff, principal, executive

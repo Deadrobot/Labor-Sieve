@@ -87,14 +87,12 @@ Role families can be added in presets by adding a snake_case key under `role_fam
 
 ## Scheduling Smoke Test
 
-Verify the scheduled-run working directory command from a temporary directory:
+Verify the scheduled-run command from a temporary config path:
 
 ```bash
-mkdir -p /tmp/labor-sieve-schedule-test
-cd /tmp/labor-sieve-schedule-test
-labor-sieve init
-labor-sieve validate-config
-labor-sieve run
+labor-sieve quickstart -c /tmp/labor-sieve-schedule-test/config.yaml
+labor-sieve validate-config -c /tmp/labor-sieve-schedule-test/config.yaml
+labor-sieve run -c /tmp/labor-sieve-schedule-test/config.yaml
 ```
 
 ## Publish

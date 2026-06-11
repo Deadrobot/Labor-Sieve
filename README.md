@@ -34,18 +34,16 @@ sudo pacman -S python-pipx
 pipx ensurepath
 ```
 
-Create a working directory, configure preferences, and run a scan:
+Create the default config, review the file locations, and run a scan:
 
 ```bash
-mkdir -p ~/labor-sieve
-cd ~/labor-sieve
-labor-sieve init
-nano config.yaml
-labor-sieve validate-config
-labor-sieve run
+labor-sieve quickstart
+nano ~/labor-sieve/config.yaml
+labor-sieve validate-config -c ~/labor-sieve/config.yaml
+labor-sieve run -c ~/labor-sieve/config.yaml
 ```
 
-`labor-sieve init` creates `~/labor-sieve/config.yaml` with the default commented configuration. Edit that file directly; a separate example file is not needed for normal use.
+`labor-sieve quickstart` creates `~/labor-sieve/config.yaml` with the default commented configuration when the file is missing. Edit that file directly; a separate example file is not needed for normal use. Default reports are written under `~/labor-sieve/output/`.
 
 If `labor-sieve` is not found after install, add `~/.local/bin` to the shell path:
 
@@ -60,13 +58,13 @@ python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install -e ".[dev]"
 
-labor-sieve init
+labor-sieve quickstart -c config.yaml
 $EDITOR config.yaml
-labor-sieve validate-config
-labor-sieve run
+labor-sieve validate-config -c config.yaml
+labor-sieve run -c config.yaml
 ```
 
-Reports are written under `output/` by default:
+Reports are written under `output/` beside the config file by default:
 
 - `output/latest.txt`
 - `output/latest.csv`
@@ -91,9 +89,9 @@ labor-sieve use-preset linux-sre
 labor-sieve run
 ```
 
-`labor-sieve init` creates the editable `config.yaml` file when it does not already exist. The created file contains the default commented settings.
+`labor-sieve init` creates the editable config file when it does not already exist. By default it uses `./config.yaml` if that file is already present, otherwise `~/labor-sieve/config.yaml`.
 
-`labor-sieve quickstart` prints first-run setup instructions. Use `labor-sieve quickstart -c /path/to/config.yaml` to print instructions for a specific config location.
+`labor-sieve quickstart` creates `~/labor-sieve/config.yaml` when the file is missing, then prints setup instructions. Use `labor-sieve quickstart -c /path/to/config.yaml` to create or print instructions for a specific config location.
 
 `labor-sieve doctor` checks the Python runtime, PyYAML, bundled config/presets, and `config.yaml`.
 
@@ -107,7 +105,7 @@ labor-sieve run
 
 `labor-sieve use-preset PRESET` merges a preset into `config.yaml`, validates the result, and writes a `.bak` backup first.
 
-`labor-sieve run` uses enabled sources from `config.yaml`. The sample source is enabled by default so scoring and reports can be tested immediately.
+`labor-sieve run` uses enabled sources from the selected config file. The sample source is enabled by default so scoring and reports can be tested immediately.
 
 ## Configuration
 
@@ -152,8 +150,8 @@ Apply a preset:
 
 ```bash
 labor-sieve list-presets
-labor-sieve use-preset linux-sre
-labor-sieve validate-config
+labor-sieve use-preset linux-sre -c ~/labor-sieve/config.yaml
+labor-sieve validate-config -c ~/labor-sieve/config.yaml
 ```
 
 ## Sources
@@ -237,25 +235,22 @@ sources:
 
 ## Manual Runs
 
-Use a working directory that contains `config.yaml` and `output/`:
+Create the default config and run from any directory:
 
 ```bash
-mkdir -p ~/labor-sieve
-cd ~/labor-sieve
-labor-sieve init
-nano config.yaml
-labor-sieve validate-config
-labor-sieve run
-less output/latest.txt
+labor-sieve quickstart
+nano ~/labor-sieve/config.yaml
+labor-sieve validate-config -c ~/labor-sieve/config.yaml
+labor-sieve run -c ~/labor-sieve/config.yaml
+less ~/labor-sieve/output/latest.txt
 ```
 
 The config file for this setup is `~/labor-sieve/config.yaml`. Default reports are written under `~/labor-sieve/output/`.
 
-Subsequent runs from the same directory:
+Subsequent runs:
 
 ```bash
-cd ~/labor-sieve
-labor-sieve run
+labor-sieve run -c ~/labor-sieve/config.yaml
 ```
 
 Update the installed command from PyPI:
@@ -266,27 +261,27 @@ pipx upgrade labor-sieve
 
 ## Scheduled Runs
 
-LaborSieve can run on a schedule with cron or a systemd user timer. Use one working directory so `config.yaml` and `output/` stay together.
+LaborSieve can run on a schedule with cron or a systemd user timer. Use the same config path each time so reports stay beside that config.
 
 Cron example, every morning at 8:17:
 
 ```bash
-mkdir -p ~/labor-sieve ~/.local/state/labor-sieve
-cd ~/labor-sieve
-labor-sieve init
+mkdir -p ~/.local/state/labor-sieve
+labor-sieve quickstart
 crontab -e
 ```
 
 Add this crontab entry, changing paths as needed:
 
 ```cron
-17 8 * * * cd "$HOME/labor-sieve" && "$HOME/.local/bin/labor-sieve" run >> "$HOME/.local/state/labor-sieve/run.log" 2>&1
+17 8 * * * "$HOME/.local/bin/labor-sieve" run -c "$HOME/labor-sieve/config.yaml" >> "$HOME/.local/state/labor-sieve/run.log" 2>&1
 ```
 
 systemd user timer example:
 
 ```bash
-mkdir -p ~/.config/systemd/user ~/labor-sieve ~/.local/state/labor-sieve
+mkdir -p ~/.config/systemd/user ~/.local/state/labor-sieve
+labor-sieve quickstart
 ```
 
 Create `~/.config/systemd/user/labor-sieve.service`:
@@ -297,8 +292,7 @@ Description=Run LaborSieve
 
 [Service]
 Type=oneshot
-WorkingDirectory=%h/labor-sieve
-ExecStart=%h/.local/bin/labor-sieve run
+ExecStart=%h/.local/bin/labor-sieve run -c %h/labor-sieve/config.yaml
 StandardOutput=append:%h/.local/state/labor-sieve/run.log
 StandardError=append:%h/.local/state/labor-sieve/run.log
 ```

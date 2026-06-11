@@ -53,6 +53,14 @@ CONFIG_FILE="$WORK_DIR/config.yaml"
 OUTPUT_DIR="$WORK_DIR/output"
 STATE_DIR="$HOME/.local/state/labor-sieve"
 
+if [ -f "$CONFIG_FILE" ]; then
+  CONFIG_STATUS="already exists"
+elif "$COMMAND_HINT" init -c "$CONFIG_FILE" >/dev/null 2>&1; then
+  CONFIG_STATUS="created with default commented settings"
+else
+  CONFIG_STATUS="could not be created automatically; run $COMMAND_HINT quickstart"
+fi
+
 cat <<EOF
 
 LaborSieve installed.
@@ -60,18 +68,14 @@ LaborSieve installed.
 Recommended files:
   Working directory: $WORK_DIR
   Config file: $CONFIG_FILE
+  Config status: $CONFIG_STATUS
   Default reports: $OUTPUT_DIR
   Run log: $STATE_DIR/run.log
 
-Create the config file with the default commented settings:
-  mkdir -p "$WORK_DIR"
-  cd "$WORK_DIR"
-  $COMMAND_HINT init -c config.yaml
-
 Then edit and run:
-  ${EDITOR:-nano} config.yaml
-  $COMMAND_HINT validate-config -c config.yaml
-  $COMMAND_HINT run -c config.yaml
+  ${EDITOR:-nano} "$CONFIG_FILE"
+  $COMMAND_HINT validate-config -c "$CONFIG_FILE"
+  $COMMAND_HINT run -c "$CONFIG_FILE"
 
 Reports:
   $OUTPUT_DIR/latest.txt

@@ -1,5 +1,5 @@
 # LaborSieve configuration.
-# Copy this file to config.yaml with: labor-sieve init
+# Created by labor-sieve quickstart or labor-sieve init.
 
 # Ordered seniority values:
 # entry, junior, mid, senior, staff, principal, executive

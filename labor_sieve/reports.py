@@ -18,8 +18,10 @@ from .taxonomy import PRIORITY_BUCKETS
 CSV_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
 
 
-def write_reports(scored_jobs: list[ScoredJob], config: Config) -> dict[str, Path]:
-    output_dir = Path(config.output.directory)
+def write_reports(scored_jobs: list[ScoredJob], config: Config, *, base_dir: Path | None = None) -> dict[str, Path]:
+    output_dir = Path(config.output.directory).expanduser()
+    if base_dir is not None and not output_dir.is_absolute():
+        output_dir = base_dir / output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
     written: dict[str, Path] = {}
