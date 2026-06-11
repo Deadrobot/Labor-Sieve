@@ -1,10 +1,12 @@
 import csv
 import json
 from pathlib import Path
+from urllib.error import HTTPError
 
 import pytest
 
 from labor_sieve.net import RedirectBlockedError
+from labor_sieve.sources.ashby import AshbySource, normalize_ashby_record
 from labor_sieve.sources.base import SourceError
 from labor_sieve.sources.greenhouse import GreenhouseSource
 from labor_sieve.sources.lever import LeverSource, normalize_lever_record
@@ -136,6 +138,32 @@ def test_normalization_handles_lever_style_record():
     assert "Infrastructure" in job.tags
 
 
+def test_normalization_handles_ashby_style_record():
+    normalized = normalize_ashby_record(
+        {
+            "id": "ashby-job",
+            "title": "Senior Data Center Operations Engineer",
+            "locationName": "Remote - United States",
+            "jobUrl": "https://jobs.ashbyhq.com/example/ashby-job",
+            "descriptionHtml": "<p>Hardware diagnostics and Linux fleet reliability.</p>",
+            "departmentName": "Infrastructure",
+            "employmentType": "FullTime",
+            "compensation": {"compensationTierSummary": "$120k - $150k"},
+        },
+        organization="example",
+    )
+    job = normalize_job_record(normalized, source_name="ashby", index=1, company_default="example")
+
+    assert job.id == "ashby-job"
+    assert job.title == "Senior Data Center Operations Engineer"
+    assert job.company == "example"
+    assert job.location == "Remote - United States"
+    assert job.role_family == "data_center_ops"
+    assert job.compensation_base_min == 120000
+    assert "Infrastructure" in job.tags
+    assert "FullTime" in job.tags
+
+
 def test_lever_source_fetches_postings(monkeypatch):
     class FakeResponse:
         def __enter__(self):
@@ -169,6 +197,83 @@ def test_lever_source_fetches_postings(monkeypatch):
     assert len(jobs) == 1
     assert jobs[0].source == "lever"
     assert jobs[0].source_id == "abc"
+
+
+def test_ashby_source_fetches_postings(monkeypatch):
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+        def read(self, size=-1):
+            return json.dumps(
+                {
+                    "jobs": [
+                        {
+                            "id": "hidden",
+                            "title": "Hidden Role",
+                            "isListed": False,
+                            "jobUrl": "https://jobs.ashbyhq.com/example/hidden",
+                        },
+                        {
+                            "id": "ashby-job",
+                            "title": "Senior Linux SRE",
+                            "jobUrl": "https://jobs.ashbyhq.com/example/ashby-job",
+                            "descriptionHtml": "<p>Linux incident response.</p>",
+                            "locationName": "Remote",
+                            "compensation": {"compensationTierSummary": "$130k - $150k"},
+                        }
+                    ]
+                }
+            ).encode("utf-8")
+
+    def fake_open(request, timeout):
+        assert "https://api.ashbyhq.com/posting-api/job-board/example?includeCompensation=true" == request.full_url
+        assert timeout == 7
+        return FakeResponse()
+
+    monkeypatch.setattr("labor_sieve.sources.ashby.open_without_redirects", fake_open)
+
+    jobs = AshbySource(["example"], timeout_seconds=7).fetch()
+
+    assert len(jobs) == 1
+    assert jobs[0].source == "ashby"
+    assert jobs[0].source_id == "ashby-job"
+    assert jobs[0].compensation_base_min == 130000
+
+
+def test_ashby_source_tries_slug_variants(monkeypatch):
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+        def read(self, size=-1):
+            return json.dumps({"jobs": [{"id": "abc", "title": "Linux SRE", "jobUrl": "https://example.invalid"}]}).encode(
+                "utf-8"
+            )
+
+    seen_urls = []
+
+    def fake_open(request, timeout):
+        seen_urls.append(request.full_url)
+        if "/ExampleOrg?" in request.full_url:
+            raise HTTPError(request.full_url, 404, "not found", {}, None)
+        return FakeResponse()
+
+    monkeypatch.setattr("labor_sieve.sources.ashby.open_without_redirects", fake_open)
+
+    jobs = AshbySource(["ExampleOrg"]).fetch()
+
+    assert len(jobs) == 1
+    assert seen_urls == [
+        "https://api.ashbyhq.com/posting-api/job-board/ExampleOrg?includeCompensation=true",
+        "https://api.ashbyhq.com/posting-api/job-board/exampleorg?includeCompensation=true",
+    ]
 
 
 def test_parse_money_handles_salary_range_mapping():
@@ -232,6 +337,16 @@ def test_lever_source_blocks_redirects(monkeypatch):
         LeverSource(["example"]).fetch()
 
 
+def test_ashby_source_blocks_redirects(monkeypatch):
+    def fake_open(request, timeout):
+        raise RedirectBlockedError("https://127.0.0.1/private")
+
+    monkeypatch.setattr("labor_sieve.sources.ashby.open_without_redirects", fake_open)
+
+    with pytest.raises(SourceError, match="redirected to https://127.0.0.1/private"):
+        AshbySource(["example"]).fetch()
+
+
 def test_lever_source_rejects_excessive_records(monkeypatch):
     class FakeResponse:
         headers = {}
@@ -253,6 +368,29 @@ def test_lever_source_rejects_excessive_records(monkeypatch):
 
     with pytest.raises(SourceError, match="more than 1 records"):
         LeverSource(["example"]).fetch()
+
+
+def test_ashby_source_rejects_excessive_records(monkeypatch):
+    class FakeResponse:
+        headers = {}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+        def read(self, size=-1):
+            return json.dumps({"jobs": [{"title": "one"}, {"title": "two"}]}).encode("utf-8")
+
+    monkeypatch.setattr("labor_sieve.sources.ashby.MAX_RECORDS_PER_SOURCE", 1)
+    monkeypatch.setattr(
+        "labor_sieve.sources.ashby.open_without_redirects",
+        lambda request, timeout: FakeResponse(),
+    )
+
+    with pytest.raises(SourceError, match="more than 1 records"):
+        AshbySource(["example"]).fetch()
 
 
 def test_local_file_source_rejects_oversized_files(tmp_path, monkeypatch):

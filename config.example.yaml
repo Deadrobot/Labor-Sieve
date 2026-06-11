@@ -96,3 +96,10 @@ sources:
     companies: []
     timeout_seconds: 20
     base_url: https://api.lever.co/v0/postings
+  # Public Ashby Job Posting API source. Use organization names from URLs like:
+  # https://jobs.ashbyhq.com/{organization}
+  ashby:
+    enabled: false
+    organizations: []
+    timeout_seconds: 20
+    base_url: https://api.ashbyhq.com/posting-api/job-board

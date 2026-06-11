@@ -24,6 +24,7 @@ def test_example_config_is_valid():
     assert config.sources.local_file.enabled is False
     assert config.sources.greenhouse.enabled is False
     assert config.sources.lever.enabled is False
+    assert config.sources.ashby.enabled is False
 
 
 def test_validation_reports_seniority_order_error():
@@ -56,6 +57,9 @@ def test_validation_accepts_configured_sources():
     data["sources"]["lever"]["enabled"] = True
     data["sources"]["lever"]["companies"] = ["example"]
     data["sources"]["lever"]["timeout_seconds"] = 10
+    data["sources"]["ashby"]["enabled"] = True
+    data["sources"]["ashby"]["organizations"] = ["example"]
+    data["sources"]["ashby"]["timeout_seconds"] = 10
 
     errors = validate_config_data(data)
     config = config_from_data(data)
@@ -65,6 +69,7 @@ def test_validation_accepts_configured_sources():
     assert config.sources.local_file.paths == ["jobs.csv"]
     assert config.sources.greenhouse.board_tokens == ["example"]
     assert config.sources.lever.companies == ["example"]
+    assert config.sources.ashby.organizations == ["example"]
 
 
 def test_validation_requires_https_for_lever_base_url():
@@ -74,6 +79,15 @@ def test_validation_requires_https_for_lever_base_url():
     errors = validate_config_data(data)
 
     assert "sources.lever.base_url must start with https://." in errors
+
+
+def test_validation_requires_https_for_ashby_base_url():
+    data = load_example()
+    data["sources"]["ashby"]["base_url"] = "http://api.ashbyhq.com/posting-api/job-board"
+
+    errors = validate_config_data(data)
+
+    assert "sources.ashby.base_url must start with https://." in errors
 
 
 def test_init_config_does_not_overwrite_existing_file(tmp_path):

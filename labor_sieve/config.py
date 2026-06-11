@@ -107,6 +107,11 @@ sources:
     companies: []
     timeout_seconds: 20
     base_url: https://api.lever.co/v0/postings
+  ashby:
+    enabled: false
+    organizations: []
+    timeout_seconds: 20
+    base_url: https://api.ashbyhq.com/posting-api/job-board
 """
 
 
@@ -179,11 +184,20 @@ class LeverSourceConfig:
 
 
 @dataclass(slots=True)
+class AshbySourceConfig:
+    enabled: bool
+    organizations: list[str]
+    timeout_seconds: int
+    base_url: str
+
+
+@dataclass(slots=True)
 class SourceConfig:
     sample: SampleSourceConfig
     local_file: LocalFileSourceConfig
     greenhouse: GreenhouseSourceConfig
     lever: LeverSourceConfig
+    ashby: AshbySourceConfig
 
 
 @dataclass(slots=True)
@@ -357,6 +371,17 @@ def validate_config_data(data: dict[str, Any]) -> list[str]:
                 errors.append("sources.lever.base_url must be a URL string.")
             elif not str(lever["base_url"]).startswith("https://"):
                 errors.append("sources.lever.base_url must start with https://.")
+        ashby = _optional_mapping(sources, "ashby", errors, label="sources.ashby")
+        if ashby is not None:
+            _require_bool(ashby, "enabled", "sources.ashby.enabled", errors)
+            _require_string_list(ashby, "organizations", "sources.ashby.organizations", errors)
+            timeout = ashby.get("timeout_seconds")
+            if not isinstance(timeout, int) or isinstance(timeout, bool) or timeout <= 0:
+                errors.append("sources.ashby.timeout_seconds must be a positive integer.")
+            if not _is_string(ashby.get("base_url")):
+                errors.append("sources.ashby.base_url must be a URL string.")
+            elif not str(ashby["base_url"]).startswith("https://"):
+                errors.append("sources.ashby.base_url must start with https://.")
 
     return errors
 
@@ -372,6 +397,7 @@ def config_from_data(data: dict[str, Any]) -> Config:
     local_file = sources.get("local_file", {})
     greenhouse = sources.get("greenhouse", {})
     lever = sources.get("lever", {})
+    ashby = sources.get("ashby", {})
     return Config(
         seniority=SeniorityConfig(
             min=seniority["min"],
@@ -418,6 +444,12 @@ def config_from_data(data: dict[str, Any]) -> Config:
                 companies=[str(value) for value in lever.get("companies", [])],
                 timeout_seconds=int(lever.get("timeout_seconds", 20)),
                 base_url=str(lever.get("base_url", "https://api.lever.co/v0/postings")),
+            ),
+            ashby=AshbySourceConfig(
+                enabled=bool(ashby.get("enabled", False)),
+                organizations=[str(value) for value in ashby.get("organizations", [])],
+                timeout_seconds=int(ashby.get("timeout_seconds", 20)),
+                base_url=str(ashby.get("base_url", "https://api.ashbyhq.com/posting-api/job-board")),
             ),
         ),
     )

@@ -39,8 +39,8 @@ Create the default config, review the file locations, and run a scan:
 ```bash
 labor-sieve quickstart
 # edit ~/labor-sieve/config.yaml with your preferred text editor
-labor-sieve validate-config -c ~/labor-sieve/config.yaml
-labor-sieve run -c ~/labor-sieve/config.yaml
+labor-sieve validate-config
+labor-sieve run
 ```
 
 `labor-sieve quickstart` creates `~/labor-sieve/config.yaml` with the default commented configuration when the file is missing. Edit that file directly; a separate example file is not needed for normal use. Default reports are written under `~/labor-sieve/output/`.
@@ -71,7 +71,7 @@ Reports are written under `output/` beside the config file by default:
 - `output/latest.json`
 - `output/latest.html`
 
-Terminal output prints scan counts and P0/P1 summaries. The text report includes every job, including rejected jobs, grouped by priority bucket.
+Run output prints source progress, scan counts, and P0/P1 summaries. The text report includes every job, including rejected jobs, grouped by priority bucket.
 
 Jobs are deduplicated before scoring. Exact URL matches are merged first, then normalized company/title/location matches. Reports show the selected source and any merged source references.
 
@@ -162,6 +162,7 @@ Available sources:
 - `local_file`: local `.csv`, `.json`, `.yaml`, or `.yml` exports
 - `greenhouse`: public Greenhouse Job Board API boards
 - `lever`: public Lever Postings API companies
+- `ashby`: public Ashby job board organizations
 
 Example local file config:
 
@@ -182,6 +183,11 @@ sources:
     companies: []
     timeout_seconds: 20
     base_url: https://api.lever.co/v0/postings
+  ashby:
+    enabled: false
+    organizations: []
+    timeout_seconds: 20
+    base_url: https://api.ashbyhq.com/posting-api/job-board
 ```
 
 Local file records can include:
@@ -210,6 +216,11 @@ sources:
     companies: []
     timeout_seconds: 20
     base_url: https://api.lever.co/v0/postings
+  ashby:
+    enabled: false
+    organizations: []
+    timeout_seconds: 20
+    base_url: https://api.ashbyhq.com/posting-api/job-board
 ```
 
 Example Lever config:
@@ -231,6 +242,37 @@ sources:
       - example-company
     timeout_seconds: 20
     base_url: https://api.lever.co/v0/postings
+  ashby:
+    enabled: false
+    organizations: []
+    timeout_seconds: 20
+    base_url: https://api.ashbyhq.com/posting-api/job-board
+```
+
+Example Ashby config:
+
+```yaml
+sources:
+  sample:
+    enabled: false
+  local_file:
+    enabled: false
+    paths: []
+  greenhouse:
+    enabled: false
+    board_tokens: []
+    timeout_seconds: 20
+  lever:
+    enabled: false
+    companies: []
+    timeout_seconds: 20
+    base_url: https://api.lever.co/v0/postings
+  ashby:
+    enabled: true
+    organizations:
+      - example-organization
+    timeout_seconds: 20
+    base_url: https://api.ashbyhq.com/posting-api/job-board
 ```
 
 ## Manual Runs
@@ -240,8 +282,8 @@ Create the default config and run from any directory:
 ```bash
 labor-sieve quickstart
 # edit ~/labor-sieve/config.yaml with your preferred text editor
-labor-sieve validate-config -c ~/labor-sieve/config.yaml
-labor-sieve run -c ~/labor-sieve/config.yaml
+labor-sieve validate-config
+labor-sieve run
 less ~/labor-sieve/output/latest.txt
 ```
 
@@ -250,8 +292,10 @@ The config file for this setup is `~/labor-sieve/config.yaml`. Default reports a
 Subsequent runs:
 
 ```bash
-labor-sieve run -c ~/labor-sieve/config.yaml
+labor-sieve run
 ```
+
+`labor-sieve run` uses `./config.yaml` if one exists, otherwise `~/labor-sieve/config.yaml`. While sources are fetching, it prints simple progress with elapsed time.
 
 Update the installed command from PyPI:
 

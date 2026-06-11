@@ -4,6 +4,8 @@
 
 - Make quickstart and install messages editor-neutral.
 - Clarify that `run` uses enabled sources from config.
+- Add Ashby as a public job board source.
+- Show source fetch progress with elapsed time during runs.
 
 ## 0.1.2
 

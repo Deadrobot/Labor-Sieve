@@ -5,6 +5,8 @@ from __future__ import annotations
 import argparse
 import shlex
 import sys
+import threading
+import time
 from pathlib import Path
 
 from . import __version__
@@ -30,6 +32,7 @@ from .presets import (
 )
 from .reports import render_terminal_summary, write_reports
 from .scoring import score_jobs
+from .sources.ashby import AshbySource
 from .sources.base import JobSource, SourceError
 from .sources.greenhouse import GreenhouseSource
 from .sources.local_file import LocalFileSource
@@ -341,7 +344,7 @@ def fetch_jobs(config: Config) -> tuple[list[Job], list[str]]:
     errors = []
     for source in enabled_sources(config):
         try:
-            jobs.extend(source.fetch())
+            jobs.extend(fetch_source_with_status(source))
         except SourceError as exc:
             errors.append(f"{source.name}: {exc}")
     return jobs, errors
@@ -368,7 +371,58 @@ def enabled_sources(config: Config) -> list[JobSource]:
                 base_url=config.sources.lever.base_url,
             )
         )
+    if config.sources.ashby.enabled:
+        sources.append(
+            AshbySource(
+                config.sources.ashby.organizations,
+                timeout_seconds=config.sources.ashby.timeout_seconds,
+                base_url=config.sources.ashby.base_url,
+            )
+        )
     return sources
+
+
+def fetch_source_with_status(source: JobSource) -> list[Job]:
+    label = f"Fetching {source.name}"
+    start = time.monotonic()
+    if not sys.stderr.isatty():
+        print(f"{label}...", file=sys.stderr)
+        try:
+            jobs = source.fetch()
+        except SourceError:
+            print(f"{label} failed after {format_elapsed(start)}.", file=sys.stderr)
+            raise
+        print(f"{label} finished in {format_elapsed(start)} ({len(jobs)} jobs).", file=sys.stderr)
+        return jobs
+
+    done = threading.Event()
+
+    def heartbeat() -> None:
+        while not done.wait(0.5):
+            print(f"\r{label}... {format_elapsed(start)}", end="", file=sys.stderr, flush=True)
+
+    thread = threading.Thread(target=heartbeat, daemon=True)
+    print(f"{label}... 0s", end="", file=sys.stderr, flush=True)
+    thread.start()
+    try:
+        jobs = source.fetch()
+    except SourceError:
+        done.set()
+        thread.join()
+        print(f"\r{label} failed after {format_elapsed(start)}.", file=sys.stderr)
+        raise
+    done.set()
+    thread.join()
+    print(f"\r{label} finished in {format_elapsed(start)} ({len(jobs)} jobs).", file=sys.stderr)
+    return jobs
+
+
+def format_elapsed(start: float) -> str:
+    elapsed = int(time.monotonic() - start)
+    minutes, seconds = divmod(elapsed, 60)
+    if minutes:
+        return f"{minutes}m {seconds}s"
+    return f"{seconds}s"
 
 
 def print_errors(errors: list[str]) -> None:
@@ -409,6 +463,14 @@ def quickstart_text(config_path: Path, *, include_create: bool) -> str:
     config_name = config_path.name
     output_dir = work_dir / "output"
     preset_dir = default_user_preset_dir()
+    uses_default_config = config_path == _absolute_path(default_config_path())
+    validate_command = "labor-sieve validate-config"
+    run_command = "labor-sieve run"
+    preset_command = "labor-sieve use-preset linux-sre"
+    if not uses_default_config:
+        validate_command = f"labor-sieve validate-config -c {_quote(config_path)}"
+        run_command = f"labor-sieve run -c {_quote(config_path)}"
+        preset_command = f"labor-sieve use-preset linux-sre -c {_quote(config_path)}"
 
     lines = [
         "Recommended files:",
@@ -433,13 +495,13 @@ def quickstart_text(config_path: Path, *, include_create: bool) -> str:
         [
             "Next steps:",
             f"  1. Edit the config file with your preferred editor: {_quote(config_path)}",
-            f"  2. Validate it: labor-sieve validate-config -c {_quote(config_path)}",
-            f"  3. Run a scan: labor-sieve run -c {_quote(config_path)}",
+            f"  2. Validate it: {validate_command}",
+            f"  3. Run a scan: {run_command}",
             f"  4. Read the text report: {_quote(str(output_dir / 'latest.txt'))}",
             "",
             "Useful setup commands:",
             "  labor-sieve list-presets",
-            f"  labor-sieve use-preset linux-sre -c {_quote(config_path)}",
+            f"  {preset_command}",
             "  labor-sieve list-options",
             "",
             "Scheduled run example:",

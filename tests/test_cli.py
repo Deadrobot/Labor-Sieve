@@ -3,7 +3,8 @@ from pathlib import Path
 import pytest
 
 from labor_sieve import __version__
-from labor_sieve.cli import main
+from labor_sieve.cli import fetch_source_with_status, main
+from labor_sieve.sources.sample import SampleSource
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -30,7 +31,9 @@ def test_quickstart_prints_first_run_steps(tmp_path, monkeypatch, capsys):
     assert "Created" in output
     assert f"Config file: {expected_config}" in output
     assert "labor-sieve init -c" not in output
-    assert f"labor-sieve validate-config -c {expected_config}" in output
+    assert "Validate it: labor-sieve validate-config" in output
+    assert "Run a scan: labor-sieve run" in output
+    assert f"labor-sieve validate-config -c {expected_config}" not in output
     assert str(expected_report) in output
 
 
@@ -43,6 +46,8 @@ def test_quickstart_accepts_explicit_config_path(tmp_path, capsys):
     assert config_path.exists()
     assert f"Config file: {config_path}" in output
     assert "Create the config file" not in output
+    assert f"labor-sieve validate-config -c {config_path}" in output
+    assert f"labor-sieve run -c {config_path}" in output
     assert str(config_path.parent / "output" / "latest.txt") in output
 
 
@@ -110,3 +115,12 @@ def test_run_uses_home_config_when_no_local_config_exists(tmp_path, monkeypatch,
 
     assert (home / "labor-sieve" / "output" / "latest.txt").exists()
     assert not (other_dir / "output" / "latest.txt").exists()
+
+
+def test_fetch_source_with_status_prints_progress(capsys):
+    jobs = fetch_source_with_status(SampleSource())
+
+    stderr = capsys.readouterr().err
+    assert jobs
+    assert "Fetching sample..." in stderr
+    assert "Fetching sample finished" in stderr
