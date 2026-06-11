@@ -83,7 +83,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     validate_parser.set_defaults(func=cmd_validate_config)
 
-    run_parser = subparsers.add_parser("run", parents=[config_parent], help="Run sample scan and write reports")
+    run_parser = subparsers.add_parser("run", parents=[config_parent], help="Run enabled sources and write reports")
     run_parser.set_defaults(func=cmd_run)
 
     list_parser = subparsers.add_parser("list-options", help="List supported taxonomy options")
@@ -432,7 +432,7 @@ def quickstart_text(config_path: Path, *, include_create: bool) -> str:
     lines.extend(
         [
             "Next steps:",
-            f"  1. Edit the config file: ${{EDITOR:-nano}} {_quote(config_path)}",
+            f"  1. Edit the config file with your preferred editor: {_quote(config_path)}",
             f"  2. Validate it: labor-sieve validate-config -c {_quote(config_path)}",
             f"  3. Run a scan: labor-sieve run -c {_quote(config_path)}",
             f"  4. Read the text report: {_quote(str(output_dir / 'latest.txt'))}",

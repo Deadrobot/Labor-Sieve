@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Make quickstart and install messages editor-neutral.
+- Clarify that `run` uses enabled sources from config.
+
 ## 0.1.2
 
 - Hide first-run config creation commands when the target config file already exists.

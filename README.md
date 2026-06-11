@@ -38,7 +38,7 @@ Create the default config, review the file locations, and run a scan:
 
 ```bash
 labor-sieve quickstart
-nano ~/labor-sieve/config.yaml
+# edit ~/labor-sieve/config.yaml with your preferred text editor
 labor-sieve validate-config -c ~/labor-sieve/config.yaml
 labor-sieve run -c ~/labor-sieve/config.yaml
 ```
@@ -59,7 +59,7 @@ python3 -m venv .venv
 python -m pip install -e ".[dev]"
 
 labor-sieve quickstart -c config.yaml
-$EDITOR config.yaml
+# edit config.yaml with your preferred text editor
 labor-sieve validate-config -c config.yaml
 labor-sieve run -c config.yaml
 ```
@@ -239,7 +239,7 @@ Create the default config and run from any directory:
 
 ```bash
 labor-sieve quickstart
-nano ~/labor-sieve/config.yaml
+# edit ~/labor-sieve/config.yaml with your preferred text editor
 labor-sieve validate-config -c ~/labor-sieve/config.yaml
 labor-sieve run -c ~/labor-sieve/config.yaml
 less ~/labor-sieve/output/latest.txt

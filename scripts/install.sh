@@ -73,7 +73,7 @@ Recommended files:
   Run log: $STATE_DIR/run.log
 
 Then edit and run:
-  ${EDITOR:-nano} "$CONFIG_FILE"
+  Edit "$CONFIG_FILE" with your preferred text editor.
   $COMMAND_HINT validate-config -c "$CONFIG_FILE"
   $COMMAND_HINT run -c "$CONFIG_FILE"
 
