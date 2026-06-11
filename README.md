@@ -163,6 +163,7 @@ Available sources:
 - `greenhouse`: public Greenhouse Job Board API boards
 - `lever`: public Lever Postings API companies
 - `ashby`: public Ashby job board organizations
+- `workday`: public Workday candidate experience sites
 
 Example local file config:
 
@@ -188,6 +189,12 @@ sources:
     organizations: []
     timeout_seconds: 20
     base_url: https://api.ashbyhq.com/posting-api/job-board
+  workday:
+    enabled: false
+    sites: []
+    timeout_seconds: 20
+    page_size: 20
+    max_jobs_per_site: 200
 ```
 
 Local file records can include:
@@ -221,6 +228,12 @@ sources:
     organizations: []
     timeout_seconds: 20
     base_url: https://api.ashbyhq.com/posting-api/job-board
+  workday:
+    enabled: false
+    sites: []
+    timeout_seconds: 20
+    page_size: 20
+    max_jobs_per_site: 200
 ```
 
 Example Lever config:
@@ -247,6 +260,12 @@ sources:
     organizations: []
     timeout_seconds: 20
     base_url: https://api.ashbyhq.com/posting-api/job-board
+  workday:
+    enabled: false
+    sites: []
+    timeout_seconds: 20
+    page_size: 20
+    max_jobs_per_site: 200
 ```
 
 Example Ashby config:
@@ -273,6 +292,45 @@ sources:
       - example-organization
     timeout_seconds: 20
     base_url: https://api.ashbyhq.com/posting-api/job-board
+  workday:
+    enabled: false
+    sites: []
+    timeout_seconds: 20
+    page_size: 20
+    max_jobs_per_site: 200
+```
+
+Example Workday config:
+
+```yaml
+sources:
+  sample:
+    enabled: false
+  local_file:
+    enabled: false
+    paths: []
+  greenhouse:
+    enabled: false
+    board_tokens: []
+    timeout_seconds: 20
+  lever:
+    enabled: false
+    companies: []
+    timeout_seconds: 20
+    base_url: https://api.lever.co/v0/postings
+  ashby:
+    enabled: false
+    organizations: []
+    timeout_seconds: 20
+    base_url: https://api.ashbyhq.com/posting-api/job-board
+  workday:
+    enabled: true
+    sites:
+      - company: Example Company
+        url: https://example.wd5.myworkdayjobs.com/ExampleExternalCareerSite
+    timeout_seconds: 20
+    page_size: 20
+    max_jobs_per_site: 200
 ```
 
 ## Manual Runs

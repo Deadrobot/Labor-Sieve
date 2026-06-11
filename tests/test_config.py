@@ -25,6 +25,7 @@ def test_example_config_is_valid():
     assert config.sources.greenhouse.enabled is False
     assert config.sources.lever.enabled is False
     assert config.sources.ashby.enabled is False
+    assert config.sources.workday.enabled is False
 
 
 def test_validation_reports_seniority_order_error():
@@ -60,6 +61,16 @@ def test_validation_accepts_configured_sources():
     data["sources"]["ashby"]["enabled"] = True
     data["sources"]["ashby"]["organizations"] = ["example"]
     data["sources"]["ashby"]["timeout_seconds"] = 10
+    data["sources"]["workday"]["enabled"] = True
+    data["sources"]["workday"]["sites"] = [
+        {
+            "company": "Example Company",
+            "url": "https://example.wd5.myworkdayjobs.com/ExampleExternalCareerSite",
+        }
+    ]
+    data["sources"]["workday"]["timeout_seconds"] = 10
+    data["sources"]["workday"]["page_size"] = 10
+    data["sources"]["workday"]["max_jobs_per_site"] = 100
 
     errors = validate_config_data(data)
     config = config_from_data(data)
@@ -70,6 +81,9 @@ def test_validation_accepts_configured_sources():
     assert config.sources.greenhouse.board_tokens == ["example"]
     assert config.sources.lever.companies == ["example"]
     assert config.sources.ashby.organizations == ["example"]
+    assert config.sources.workday.sites[0].company == "Example Company"
+    assert config.sources.workday.page_size == 10
+    assert config.sources.workday.max_jobs_per_site == 100
 
 
 def test_validation_requires_https_for_lever_base_url():
@@ -88,6 +102,20 @@ def test_validation_requires_https_for_ashby_base_url():
     errors = validate_config_data(data)
 
     assert "sources.ashby.base_url must start with https://." in errors
+
+
+def test_validation_requires_workday_site_url():
+    data = load_example()
+    data["sources"]["workday"]["sites"] = [
+        {
+            "company": "Example Company",
+            "url": "https://example.invalid/ExampleExternalCareerSite",
+        }
+    ]
+
+    errors = validate_config_data(data)
+
+    assert "sources.workday.sites[0].url must be an https://*.myworkdayjobs.com URL." in errors
 
 
 def test_init_config_does_not_overwrite_existing_file(tmp_path):

@@ -38,6 +38,7 @@ from .sources.greenhouse import GreenhouseSource
 from .sources.local_file import LocalFileSource
 from .sources.lever import LeverSource
 from .sources.sample import SampleSource
+from .sources.workday import WorkdaySite, WorkdaySource
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -377,6 +378,18 @@ def enabled_sources(config: Config) -> list[JobSource]:
                 config.sources.ashby.organizations,
                 timeout_seconds=config.sources.ashby.timeout_seconds,
                 base_url=config.sources.ashby.base_url,
+            )
+        )
+    if config.sources.workday.enabled:
+        sources.append(
+            WorkdaySource(
+                [
+                    WorkdaySite(company=site.company, url=site.url)
+                    for site in config.sources.workday.sites
+                ],
+                timeout_seconds=config.sources.workday.timeout_seconds,
+                page_size=config.sources.workday.page_size,
+                max_jobs_per_site=config.sources.workday.max_jobs_per_site,
             )
         )
     return sources

@@ -6,6 +6,7 @@
 - Clarify that `run` uses enabled sources from config.
 - Add Ashby as a public job board source.
 - Show source fetch progress with elapsed time during runs.
+- Add Workday as a public candidate experience source.
 
 ## 0.1.2
 

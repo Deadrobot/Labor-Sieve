@@ -8,6 +8,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from .taxonomy import ROLE_FAMILIES, SENIORITY_LEVELS, seniority_index
 
@@ -112,6 +113,12 @@ sources:
     organizations: []
     timeout_seconds: 20
     base_url: https://api.ashbyhq.com/posting-api/job-board
+  workday:
+    enabled: false
+    sites: []
+    timeout_seconds: 20
+    page_size: 20
+    max_jobs_per_site: 200
 """
 
 
@@ -192,12 +199,28 @@ class AshbySourceConfig:
 
 
 @dataclass(slots=True)
+class WorkdaySiteConfig:
+    company: str
+    url: str
+
+
+@dataclass(slots=True)
+class WorkdaySourceConfig:
+    enabled: bool
+    sites: list[WorkdaySiteConfig]
+    timeout_seconds: int
+    page_size: int
+    max_jobs_per_site: int
+
+
+@dataclass(slots=True)
 class SourceConfig:
     sample: SampleSourceConfig
     local_file: LocalFileSourceConfig
     greenhouse: GreenhouseSourceConfig
     lever: LeverSourceConfig
     ashby: AshbySourceConfig
+    workday: WorkdaySourceConfig
 
 
 @dataclass(slots=True)
@@ -382,6 +405,27 @@ def validate_config_data(data: dict[str, Any]) -> list[str]:
                 errors.append("sources.ashby.base_url must be a URL string.")
             elif not str(ashby["base_url"]).startswith("https://"):
                 errors.append("sources.ashby.base_url must start with https://.")
+        workday = _optional_mapping(sources, "workday", errors, label="sources.workday")
+        if workday is not None:
+            _require_bool(workday, "enabled", "sources.workday.enabled", errors)
+            _require_workday_sites(workday, errors)
+            timeout = workday.get("timeout_seconds")
+            if not isinstance(timeout, int) or isinstance(timeout, bool) or timeout <= 0:
+                errors.append("sources.workday.timeout_seconds must be a positive integer.")
+            page_size = workday.get("page_size")
+            if (
+                not isinstance(page_size, int)
+                or isinstance(page_size, bool)
+                or not 1 <= page_size <= 100
+            ):
+                errors.append("sources.workday.page_size must be an integer from 1 to 100.")
+            max_jobs = workday.get("max_jobs_per_site")
+            if (
+                not isinstance(max_jobs, int)
+                or isinstance(max_jobs, bool)
+                or not 1 <= max_jobs <= 5000
+            ):
+                errors.append("sources.workday.max_jobs_per_site must be an integer from 1 to 5000.")
 
     return errors
 
@@ -398,6 +442,7 @@ def config_from_data(data: dict[str, Any]) -> Config:
     greenhouse = sources.get("greenhouse", {})
     lever = sources.get("lever", {})
     ashby = sources.get("ashby", {})
+    workday = sources.get("workday", {})
     return Config(
         seniority=SeniorityConfig(
             min=seniority["min"],
@@ -450,6 +495,16 @@ def config_from_data(data: dict[str, Any]) -> Config:
                 organizations=[str(value) for value in ashby.get("organizations", [])],
                 timeout_seconds=int(ashby.get("timeout_seconds", 20)),
                 base_url=str(ashby.get("base_url", "https://api.ashbyhq.com/posting-api/job-board")),
+            ),
+            workday=WorkdaySourceConfig(
+                enabled=bool(workday.get("enabled", False)),
+                sites=[
+                    WorkdaySiteConfig(company=str(site["company"]), url=str(site["url"]))
+                    for site in workday.get("sites", [])
+                ],
+                timeout_seconds=int(workday.get("timeout_seconds", 20)),
+                page_size=int(workday.get("page_size", 20)),
+                max_jobs_per_site=int(workday.get("max_jobs_per_site", 200)),
             ),
         ),
     )
@@ -514,5 +569,39 @@ def _require_string_list(
         errors.append(f"{label} must be a list of strings.")
 
 
+def _require_workday_sites(mapping: dict[str, Any], errors: list[str]) -> None:
+    sites = mapping.get("sites")
+    if not isinstance(sites, list):
+        errors.append("sources.workday.sites must be a list of mappings.")
+        return
+    for index, site in enumerate(sites):
+        label = f"sources.workday.sites[{index}]"
+        if not isinstance(site, dict):
+            errors.append(f"{label} must be a mapping.")
+            continue
+        company = site.get("company")
+        url = site.get("url")
+        if not _is_string(company):
+            errors.append(f"{label}.company must be a non-empty string.")
+        if not _is_string(url):
+            errors.append(f"{label}.url must be a URL string.")
+        elif not _is_workday_url(str(url)):
+            errors.append(f"{label}.url must be an https://*.myworkdayjobs.com URL.")
+
+
 def _is_string(value: Any) -> bool:
     return isinstance(value, str) and bool(value.strip())
+
+
+def _is_workday_url(value: str) -> bool:
+    parsed = urlsplit(value.strip())
+    host = parsed.hostname.casefold() if parsed.hostname else ""
+    try:
+        port = parsed.port
+    except ValueError:
+        return False
+    if parsed.username or parsed.password or port is not None:
+        return False
+    if parsed.scheme != "https" or not host.endswith(".myworkdayjobs.com"):
+        return False
+    return bool([part for part in parsed.path.split("/") if part])

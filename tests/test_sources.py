@@ -12,6 +12,7 @@ from labor_sieve.sources.greenhouse import GreenhouseSource
 from labor_sieve.sources.lever import LeverSource, normalize_lever_record
 from labor_sieve.sources.local_file import LocalFileSource
 from labor_sieve.sources.normalization import infer_role_family, normalize_job_record, parse_money
+from labor_sieve.sources.workday import WorkdaySite, WorkdaySource, normalize_workday_record, parse_workday_site
 
 
 def test_local_file_source_reads_csv_records(tmp_path):
@@ -164,6 +165,42 @@ def test_normalization_handles_ashby_style_record():
     assert "FullTime" in job.tags
 
 
+def test_normalization_handles_workday_style_record():
+    site = parse_workday_site(
+        WorkdaySite(
+            company="Example Company",
+            url="https://example.wd5.myworkdayjobs.com/ExampleExternalCareerSite",
+        )
+    )
+    normalized = normalize_workday_record(
+        {
+            "externalPath": "/en-US/ExampleExternalCareerSite/job/Austin-TX/Linux-SRE_R123",
+            "title": "Senior Linux SRE",
+            "locationsText": "Austin, TX",
+            "bulletFields": ["Full time", "Remote"],
+        },
+        {
+            "jobPostingInfo": {
+                "jobReqId": "R123",
+                "jobDescription": "<p>Linux incident response and automation.</p>",
+                "payRange": "$140k - $160k",
+            }
+        },
+        site,
+    )
+    job = normalize_job_record(normalized, source_name="workday", index=1, company_default="Example Company")
+
+    assert job.id == "R123"
+    assert job.title == "Senior Linux SRE"
+    assert job.company == "Example Company"
+    assert job.url == "https://example.wd5.myworkdayjobs.com/en-US/ExampleExternalCareerSite/job/Austin-TX/Linux-SRE_R123"
+    assert job.location == "Austin, TX"
+    assert job.remote is True
+    assert job.role_family == "sre_infra_ops"
+    assert job.compensation_base_min == 140000
+    assert "Full time" in job.tags
+
+
 def test_lever_source_fetches_postings(monkeypatch):
     class FakeResponse:
         def __enter__(self):
@@ -276,6 +313,78 @@ def test_ashby_source_tries_slug_variants(monkeypatch):
     ]
 
 
+def test_workday_source_fetches_postings_and_details(monkeypatch):
+    class FakeResponse:
+        def __init__(self, payload):
+            self.payload = payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+        def read(self, size=-1):
+            return json.dumps(self.payload).encode("utf-8")
+
+    seen_requests = []
+
+    def fake_open(request, timeout):
+        seen_requests.append((request.get_method(), request.full_url, request.data))
+        assert timeout == 7
+        if request.full_url.endswith("/wday/cxs/example/ExampleExternalCareerSite/jobs"):
+            assert request.get_method() == "POST"
+            body = json.loads(request.data.decode("utf-8"))
+            assert body["limit"] == 2
+            assert body["offset"] == 0
+            return FakeResponse(
+                {
+                    "total": 1,
+                    "jobPostings": [
+                        {
+                            "externalPath": "/en-US/ExampleExternalCareerSite/job/Linux-SRE_R123",
+                            "title": "Senior Linux SRE",
+                            "locationsText": "Remote",
+                            "bulletFields": ["Full time"],
+                        }
+                    ],
+                }
+            )
+        assert request.full_url.endswith(
+            "/wday/cxs/example/ExampleExternalCareerSite/en-US/ExampleExternalCareerSite/job/Linux-SRE_R123"
+        )
+        assert request.get_method() == "GET"
+        return FakeResponse(
+            {
+                "jobPostingInfo": {
+                    "jobReqId": "R123",
+                    "jobDescription": "<p>Linux incident response.</p>",
+                    "payRange": "$130k - $150k",
+                }
+            }
+        )
+
+    monkeypatch.setattr("labor_sieve.sources.workday.open_without_redirects", fake_open)
+
+    jobs = WorkdaySource(
+        [
+            WorkdaySite(
+                company="Example Company",
+                url="https://example.wd5.myworkdayjobs.com/ExampleExternalCareerSite",
+            )
+        ],
+        timeout_seconds=7,
+        page_size=2,
+    ).fetch()
+
+    assert len(jobs) == 1
+    assert jobs[0].source == "workday"
+    assert jobs[0].source_id == "R123"
+    assert jobs[0].compensation_base_min == 130000
+    assert jobs[0].url == "https://example.wd5.myworkdayjobs.com/en-US/ExampleExternalCareerSite/job/Linux-SRE_R123"
+    assert [method for method, _url, _data in seen_requests] == ["POST", "GET"]
+
+
 def test_parse_money_handles_salary_range_mapping():
     assert parse_money({"min": 140000, "max": 180000}) == 140000
     assert parse_money({"minAmount": "$150k"}) == 150000
@@ -345,6 +454,23 @@ def test_ashby_source_blocks_redirects(monkeypatch):
 
     with pytest.raises(SourceError, match="redirected to https://127.0.0.1/private"):
         AshbySource(["example"]).fetch()
+
+
+def test_workday_source_blocks_redirects(monkeypatch):
+    def fake_open(request, timeout):
+        raise RedirectBlockedError("https://127.0.0.1/private")
+
+    monkeypatch.setattr("labor_sieve.sources.workday.open_without_redirects", fake_open)
+
+    with pytest.raises(SourceError, match="redirected to https://127.0.0.1/private"):
+        WorkdaySource(
+            [
+                WorkdaySite(
+                    company="Example Company",
+                    url="https://example.wd5.myworkdayjobs.com/ExampleExternalCareerSite",
+                )
+            ]
+        ).fetch()
 
 
 def test_lever_source_rejects_excessive_records(monkeypatch):
