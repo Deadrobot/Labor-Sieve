@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.4
+
 ## 0.1.3
 
 - Make quickstart and install messages editor-neutral.
