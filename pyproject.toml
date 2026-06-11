@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "labor-sieve"
+version = "0.1.0"
+description = "Linux-first command-line job search and reporting for operations-adjacent workers."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "PyYAML>=6.0",
+]
+authors = [
+  { name = "LaborSieve maintainers" },
+]
+license = "MIT"
+keywords = ["jobs", "cli", "sre", "operations", "linux"]
+
+[project.optional-dependencies]
+dev = [
+  "build>=1.2",
+  "pytest>=8.0",
+  "setuptools>=68",
+]
+
+[project.scripts]
+labor-sieve = "labor_sieve.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["labor_sieve*"]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["__pycache__/*", "*.pyc", "*.pyo"]
+
+[tool.setuptools.data-files]
+"share/labor-sieve" = [
+  "config.example.yaml",
+]
+"share/labor-sieve/presets" = [
+  "presets/operations-engineer.yaml",
+  "presets/linux-sre.yaml",
+  "presets/datacenter-hardware.yaml",
+  "presets/logistics-process.yaml",
+  "presets/implementation-support.yaml",
+  "presets/senior-infra-lead.yaml",
+]
+"share/labor-sieve/scripts" = [
+  "scripts/install.sh",
+  "scripts/build-release.sh",
+]

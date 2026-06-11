@@ -1,0 +1,98 @@
+# LaborSieve configuration.
+# Copy this file to config.yaml with: labor-sieve init
+
+# Ordered seniority values:
+# entry, junior, mid, senior, staff, principal, executive
+seniority:
+  min: mid
+  max: staff
+  allow_principal: false
+  allow_executive: false
+
+# Built-in role family values:
+# sre_infra_ops, data_center_ops, fleet_reliability, platform_ops,
+# implementation_support, logistics_process, customer_operations,
+# software_engineering, architect, management, unknown
+#
+# You may add custom snake_case role families here later. Source adapters can
+# emit those values and the scorer will use the configured weight.
+role_family_weights:
+  sre_infra_ops: 1.00
+  data_center_ops: 0.95
+  fleet_reliability: 0.90
+  platform_ops: 0.88
+  implementation_support: 0.45
+  logistics_process: 0.75
+  customer_operations: 0.50
+  architect: 0.35
+  management: 0.15
+  software_engineering: 0.10
+  unknown: 0.05
+
+keywords:
+  boost:
+    - linux
+    - production operations
+    - incident response
+    - reliability
+    - automation
+    - capacity planning
+    - data center
+    - fleet
+    - hardware
+    - logistics
+    - process improvement
+    - implementation
+    - customer support
+    - troubleshooting
+  penalize:
+    - frontend
+    - full-stack
+    - mobile app
+    - leetcode
+    - product engineering
+    - director
+    - vp
+    - head of
+    - people management
+
+locations:
+  remote: true
+  hybrid_locations:
+    - San Francisco Bay Area
+    - Seattle
+    - Austin
+
+compensation:
+  minimum_base: 115000
+
+output:
+  directory: output
+  txt: true
+  csv: true
+  json: true
+  html: true
+
+sources:
+  sample:
+    enabled: true
+  # Load jobs from local exports before network adapters are configured.
+  # Supported file types: .csv, .json, .yaml, .yml
+  # Records may include title, company, location, remote, hybrid, seniority,
+  # role_family, compensation_base_min, url, description, and tags.
+  local_file:
+    enabled: false
+    paths: []
+  # Public Greenhouse Job Board API source. Use board tokens from URLs like:
+  # https://boards.greenhouse.io/{board_token}
+  greenhouse:
+    enabled: false
+    board_tokens: []
+    timeout_seconds: 20
+  # Public Lever Postings API source. Use company names from URLs like:
+  # https://jobs.lever.co/{company}
+  lever:
+    enabled: false
+    companies: []
+    timeout_seconds: 20
+    base_url: https://api.lever.co/v0/postings

@@ -1,0 +1,22 @@
+name: implementation-support
+description: Technical implementation, customer support escalation, integrations, and troubleshooting work.
+role_family_weights:
+  implementation_support: 1.00
+  customer_operations: 0.85
+  sre_infra_ops: 0.65
+  platform_ops: 0.55
+  logistics_process: 0.45
+keywords:
+  boost:
+    - implementation
+    - customer support
+    - troubleshooting
+    - integrations
+    - linux
+    - runbook
+    - escalation
+  penalize:
+    - frontend
+    - mobile app
+    - leetcode
+    - people management

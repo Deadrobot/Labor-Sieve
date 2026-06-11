@@ -1,0 +1,24 @@
+name: operations-engineer
+description: Production operations, incident response, fleet reliability, and process-heavy infrastructure work.
+role_family_weights:
+  sre_infra_ops: 1.00
+  fleet_reliability: 0.95
+  platform_ops: 0.85
+  data_center_ops: 0.80
+  logistics_process: 0.70
+  implementation_support: 0.60
+keywords:
+  boost:
+    - production operations
+    - incident response
+    - reliability
+    - automation
+    - capacity planning
+    - root cause
+    - runbook
+    - fleet
+  penalize:
+    - frontend
+    - mobile app
+    - leetcode
+    - people management

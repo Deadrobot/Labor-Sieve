@@ -1,0 +1,23 @@
+name: linux-sre
+description: Linux infrastructure, SRE, automation, observability, and on-call operations.
+role_family_weights:
+  sre_infra_ops: 1.00
+  platform_ops: 0.95
+  fleet_reliability: 0.85
+  data_center_ops: 0.70
+  implementation_support: 0.50
+keywords:
+  boost:
+    - linux
+    - sre
+    - incident response
+    - automation
+    - observability
+    - shell
+    - terraform
+    - capacity planning
+  penalize:
+    - frontend
+    - mobile app
+    - product engineering
+    - leetcode

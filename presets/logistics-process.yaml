@@ -1,0 +1,22 @@
+name: logistics-process
+description: Logistics, workflow optimization, SOPs, operations analytics, and process improvement roles.
+role_family_weights:
+  logistics_process: 1.00
+  fleet_reliability: 0.80
+  customer_operations: 0.70
+  implementation_support: 0.65
+  data_center_ops: 0.55
+keywords:
+  boost:
+    - logistics
+    - process improvement
+    - workflow
+    - sop
+    - root cause
+    - operations analytics
+    - kpi
+  penalize:
+    - frontend
+    - mobile app
+    - leetcode
+    - vp

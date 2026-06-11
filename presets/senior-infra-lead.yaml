@@ -1,0 +1,28 @@
+name: senior-infra-lead
+description: Senior individual-contributor infrastructure leadership without executive management weighting.
+seniority:
+  min: senior
+  max: principal
+  allow_principal: true
+  allow_executive: false
+role_family_weights:
+  sre_infra_ops: 1.00
+  platform_ops: 0.95
+  fleet_reliability: 0.90
+  data_center_ops: 0.75
+  architect: 0.70
+  management: 0.20
+keywords:
+  boost:
+    - linux
+    - architecture
+    - reliability
+    - capacity planning
+    - incident response
+    - automation
+    - technical leadership
+  penalize:
+    - director
+    - vp
+    - head of
+    - people management
