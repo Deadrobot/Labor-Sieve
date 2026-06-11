@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Clarify first-run and post-install setup messages with explicit working directory, config path, report path, and config creation command.
+
 ## 0.1.0
 
 - CLI commands: init, quickstart, doctor, validate-config, list-options, presets, and run.

@@ -83,6 +83,7 @@ def test_init_config_does_not_overwrite_existing_file(tmp_path):
     message = init_config(config_path)
 
     assert "already exists" in message
+    assert str(config_path) in message
     assert config_path.read_text(encoding="utf-8") == "existing: true\n"
 
 

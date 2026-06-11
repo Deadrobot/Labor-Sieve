@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import shlex
 import sys
 from pathlib import Path
 
@@ -56,7 +57,11 @@ def build_parser() -> argparse.ArgumentParser:
     init_parser = subparsers.add_parser("init", parents=[config_parent], help="Create config.yaml")
     init_parser.set_defaults(func=cmd_init)
 
-    quickstart_parser = subparsers.add_parser("quickstart", help="Print first-run setup instructions")
+    quickstart_parser = subparsers.add_parser(
+        "quickstart",
+        parents=[config_parent],
+        help="Print first-run setup instructions",
+    )
     quickstart_parser.set_defaults(func=cmd_quickstart)
 
     doctor_parser = subparsers.add_parser(
@@ -124,19 +129,23 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def cmd_init(args: argparse.Namespace) -> int:
+    config_path = Path(args.config).expanduser()
     try:
-        print(init_config(Path(args.config)))
+        print(init_config(config_path))
     except ConfigError as exc:
         print_errors(exc.errors)
         return 1
     print()
-    print(quickstart_text(Path(args.config)))
+    print(quickstart_text(config_path, include_create=False))
     return 0
 
 
 def cmd_quickstart(args: argparse.Namespace) -> int:
-    del args
-    print(quickstart_text(Path("config.yaml")))
+    if args.config == "config.yaml":
+        config_path = Path.home() / "labor-sieve" / "config.yaml"
+    else:
+        config_path = Path(args.config).expanduser()
+    print(quickstart_text(config_path, include_create=True))
     return 0
 
 
@@ -362,27 +371,75 @@ def _optional_path(value: str | None) -> Path | None:
     return Path(value).expanduser()
 
 
-def quickstart_text(config_path: Path) -> str:
-    return "\n".join(
+def quickstart_text(config_path: Path, *, include_create: bool) -> str:
+    config_path = _absolute_path(config_path)
+    work_dir = config_path.parent
+    config_name = config_path.name
+    output_dir = work_dir / "output"
+    preset_dir = default_user_preset_dir()
+
+    lines = [
+        "Recommended files:",
+        f"  Working directory: {work_dir}",
+        f"  Config file: {config_path}",
+        f"  Default reports: {output_dir}",
+        f"  Downloaded presets: {preset_dir}",
+        "",
+    ]
+
+    if include_create:
+        lines.extend(
+            [
+                "Create the config file with the default commented settings:",
+                f"  mkdir -p {_quote(work_dir)}",
+                f"  cd {_quote(work_dir)}",
+                f"  labor-sieve init -c {_quote(config_name)}",
+                "",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "Config file:",
+                f"  {config_path} now contains the default commented settings.",
+                "",
+            ]
+        )
+
+    lines.extend(
         [
             "Next steps:",
-            f"  1. Edit {config_path} for your role families, keywords, locations, compensation, and sources.",
-            f"  2. Validate it: labor-sieve validate-config -c {config_path}",
-            f"  3. Run a scan: labor-sieve run -c {config_path}",
-            "  4. Read the full report: output/latest.txt",
+            f"  1. Edit the config file: ${{EDITOR:-nano}} {_quote(config_name)}",
+            f"  2. Validate it: labor-sieve validate-config -c {_quote(config_name)}",
+            f"  3. Run a scan from the working directory: labor-sieve run -c {_quote(config_name)}",
+            f"  4. Read the text report: {_quote(str(output_dir / 'latest.txt'))}",
             "",
             "Useful setup commands:",
             "  labor-sieve list-presets",
-            f"  labor-sieve use-preset linux-sre -c {config_path}",
+            f"  labor-sieve use-preset linux-sre -c {_quote(config_name)}",
             "  labor-sieve list-options",
             "",
             "Scheduled run example:",
             (
-                '  17 8 * * * cd "$HOME/labor-sieve" && "$HOME/.local/bin/labor-sieve" run '
-                '>> "$HOME/.local/state/labor-sieve/run.log" 2>&1'
+                f"  17 8 * * * cd {_quote(work_dir)} && "
+                f"{_quote(str(Path.home() / '.local' / 'bin' / 'labor-sieve'))} run "
+                f"-c {_quote(config_name)} >> "
+                f"{_quote(str(Path.home() / '.local' / 'state' / 'labor-sieve' / 'run.log'))} 2>&1"
             ),
         ]
     )
+    return "\n".join(lines)
+
+
+def _absolute_path(path: Path) -> Path:
+    path = path.expanduser()
+    if not path.is_absolute():
+        path = Path.cwd() / path
+    return path.resolve(strict=False)
+
+
+def _quote(value: str | Path) -> str:
+    return shlex.quote(str(value))
 
 
 if __name__ == "__main__":

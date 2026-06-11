@@ -21,8 +21,23 @@ def test_quickstart_prints_first_run_steps(capsys):
     assert main(["quickstart"]) == 0
 
     output = capsys.readouterr().out
+    expected_config = Path.home() / "labor-sieve" / "config.yaml"
     assert "Next steps:" in output
+    assert f"Config file: {expected_config}" in output
+    assert "labor-sieve init -c config.yaml" in output
     assert "labor-sieve validate-config -c config.yaml" in output
+    assert str(Path.home() / "labor-sieve" / "output" / "latest.txt") in output
+
+
+def test_quickstart_accepts_explicit_config_path(tmp_path, capsys):
+    config_path = tmp_path / "custom" / "config.yaml"
+
+    assert main(["quickstart", "-c", str(config_path)]) == 0
+
+    output = capsys.readouterr().out
+    assert f"Config file: {config_path}" in output
+    assert f"mkdir -p {config_path.parent}" in output
+    assert str(config_path.parent / "output" / "latest.txt") in output
 
 
 def test_doctor_passes_with_valid_config(tmp_path, capsys):

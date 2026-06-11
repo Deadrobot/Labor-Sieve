@@ -37,6 +37,8 @@ labor-sieve validate-config
 labor-sieve run
 ```
 
+`labor-sieve init` creates `~/labor-sieve/config.yaml` with the default commented configuration. Edit that file directly; a separate example file is not needed for normal use.
+
 If `labor-sieve` is not found after install, add `~/.local/bin` to the shell path:
 
 ```bash
@@ -81,9 +83,9 @@ labor-sieve use-preset linux-sre
 labor-sieve run
 ```
 
-`labor-sieve init` copies `config.example.yaml` to `config.yaml` when `config.yaml` does not already exist.
+`labor-sieve init` creates the editable `config.yaml` file when it does not already exist. The created file contains the default commented settings.
 
-`labor-sieve quickstart` prints first-run setup instructions.
+`labor-sieve quickstart` prints first-run setup instructions. Use `labor-sieve quickstart -c /path/to/config.yaml` to print instructions for a specific config location.
 
 `labor-sieve doctor` checks the Python runtime, PyYAML, bundled config/presets, and `config.yaml`.
 
@@ -238,6 +240,8 @@ labor-sieve validate-config
 labor-sieve run
 less output/latest.txt
 ```
+
+The config file for this setup is `~/labor-sieve/config.yaml`. Default reports are written under `~/labor-sieve/output/`.
 
 Subsequent runs from the same directory:
 

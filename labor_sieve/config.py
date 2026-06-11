@@ -202,8 +202,10 @@ ROLE_FAMILY_NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 
 def init_config(destination: Path = Path("config.yaml")) -> str:
     """Create a config file from the example when one does not already exist."""
+    destination = destination.expanduser()
+    display_path = destination.resolve(strict=False)
     if destination.exists():
-        return f"{destination} already exists; leaving it unchanged."
+        return f"{display_path} already exists; leaving it unchanged."
 
     try:
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -213,8 +215,8 @@ def init_config(destination: Path = Path("config.yaml")) -> str:
         else:
             destination.write_text(DEFAULT_CONFIG_EXAMPLE, encoding="utf-8")
     except OSError as exc:
-        raise ConfigError([f"{destination} could not be created: {exc}"]) from exc
-    return f"Created {destination}."
+        raise ConfigError([f"{display_path} could not be created: {exc}"]) from exc
+    return f"Created {display_path} with default commented settings."
 
 
 def find_config_example() -> Path | None:

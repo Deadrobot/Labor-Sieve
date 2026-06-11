@@ -48,21 +48,36 @@ else
   COMMAND_HINT="$BIN_DIR/labor-sieve"
 fi
 
+WORK_DIR="$HOME/labor-sieve"
+CONFIG_FILE="$WORK_DIR/config.yaml"
+OUTPUT_DIR="$WORK_DIR/output"
+STATE_DIR="$HOME/.local/state/labor-sieve"
+
 cat <<EOF
 
 LaborSieve installed.
 
-First run:
-  $COMMAND_HINT init
+Recommended files:
+  Working directory: $WORK_DIR
+  Config file: $CONFIG_FILE
+  Default reports: $OUTPUT_DIR
+  Run log: $STATE_DIR/run.log
+
+Create the config file with the default commented settings:
+  mkdir -p "$WORK_DIR"
+  cd "$WORK_DIR"
+  $COMMAND_HINT init -c config.yaml
+
+Then edit and run:
   ${EDITOR:-nano} config.yaml
-  $COMMAND_HINT validate-config
-  $COMMAND_HINT run
+  $COMMAND_HINT validate-config -c config.yaml
+  $COMMAND_HINT run -c config.yaml
 
 Reports:
-  output/latest.txt
-  output/latest.csv
-  output/latest.json
-  output/latest.html
+  $OUTPUT_DIR/latest.txt
+  $OUTPUT_DIR/latest.csv
+  $OUTPUT_DIR/latest.json
+  $OUTPUT_DIR/latest.html
 
 For setup help:
   $COMMAND_HINT quickstart
