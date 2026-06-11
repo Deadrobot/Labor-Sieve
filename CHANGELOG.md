@@ -7,6 +7,7 @@
 - Add Ashby as a public job board source.
 - Show source fetch progress with elapsed time during runs.
 - Add Workday as a public candidate experience source.
+- Include Workday starter company examples in the default config and quickstart guidance.
 
 ## 0.1.2
 

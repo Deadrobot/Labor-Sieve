@@ -26,6 +26,7 @@ def test_example_config_is_valid():
     assert config.sources.lever.enabled is False
     assert config.sources.ashby.enabled is False
     assert config.sources.workday.enabled is False
+    assert [site.company for site in config.sources.workday.sites] == ["NVIDIA", "Equinix", "Micron"]
 
 
 def test_validation_reports_seniority_order_error():

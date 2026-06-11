@@ -33,6 +33,8 @@ def test_quickstart_prints_first_run_steps(tmp_path, monkeypatch, capsys):
     assert "labor-sieve init -c" not in output
     assert "Validate it: labor-sieve validate-config" in output
     assert "Run a scan: labor-sieve run" in output
+    assert "sources.workday.sites" in output
+    assert "sources.workday.enabled" in output
     assert f"labor-sieve validate-config -c {expected_config}" not in output
     assert str(expected_report) in output
 

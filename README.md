@@ -165,6 +165,8 @@ Available sources:
 - `ashby`: public Ashby job board organizations
 - `workday`: public Workday candidate experience sites
 
+The default config includes a disabled Workday company list with starter examples for NVIDIA, Equinix, and Micron. To use it, set `sources.workday.enabled` to `true` and keep, remove, or add entries under `sources.workday.sites`.
+
 Example local file config:
 
 ```yaml
@@ -326,8 +328,12 @@ sources:
   workday:
     enabled: true
     sites:
-      - company: Example Company
-        url: https://example.wd5.myworkdayjobs.com/ExampleExternalCareerSite
+      - company: NVIDIA
+        url: https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite
+      - company: Equinix
+        url: https://equinix.wd1.myworkdayjobs.com/External
+      - company: Micron
+        url: https://micron.wd1.myworkdayjobs.com/External
     timeout_seconds: 20
     page_size: 20
     max_jobs_per_site: 200
@@ -346,6 +352,8 @@ less ~/labor-sieve/output/latest.txt
 ```
 
 The config file for this setup is `~/labor-sieve/config.yaml`. Default reports are written under `~/labor-sieve/output/`.
+
+For Workday scans, edit `~/labor-sieve/config.yaml`, review the company entries under `sources.workday.sites`, and set `sources.workday.enabled` to `true`.
 
 Subsequent runs:
 

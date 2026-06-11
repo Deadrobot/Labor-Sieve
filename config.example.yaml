@@ -105,12 +105,17 @@ sources:
     base_url: https://api.ashbyhq.com/posting-api/job-board
   # Public Workday candidate experience source. Use career site URLs like:
   # https://example.wd5.myworkdayjobs.com/ExampleExternalCareerSite
+  # Workday checks only the company sites listed here after enabled is true.
+  # Keep, remove, or add entries based on the companies you want to scan.
   workday:
     enabled: false
-    sites: []
-    # To enable, replace [] with entries like:
-    # - company: Example Company
-    #   url: https://example.wd5.myworkdayjobs.com/ExampleExternalCareerSite
+    sites:
+      - company: NVIDIA
+        url: https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite
+      - company: Equinix
+        url: https://equinix.wd1.myworkdayjobs.com/External
+      - company: Micron
+        url: https://micron.wd1.myworkdayjobs.com/External
     timeout_seconds: 20
     page_size: 20
     max_jobs_per_site: 200
