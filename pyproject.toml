@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "labor-sieve"
-version = "0.1.1"
+dynamic = ["version"]
 description = "Linux-first command-line job search and reporting for operations-adjacent roles."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -43,6 +43,9 @@ labor-sieve = "labor_sieve.cli:main"
 [tool.setuptools.packages.find]
 include = ["labor_sieve*"]
 
+[tool.setuptools.dynamic]
+version = { attr = "labor_sieve.__version__" }
+
 [tool.setuptools.exclude-package-data]
 "*" = ["__pycache__/*", "*.pyc", "*.pyo"]
 
@@ -64,4 +67,5 @@ include = ["labor_sieve*"]
   "scripts/install.sh",
   "scripts/build-release.sh",
   "scripts/build-preset-index.py",
+  "scripts/set-version.py",
 ]

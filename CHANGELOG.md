@@ -2,8 +2,11 @@
 
 ## Unreleased
 
+## 0.1.2
+
 - Hide first-run config creation commands when the target config file already exists.
 - Create the default config from `labor-sieve quickstart` and write reports beside explicit config paths.
+- Add a release version helper and build-time artifact version check.
 
 ## 0.1.1
 

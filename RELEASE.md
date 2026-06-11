@@ -6,12 +6,13 @@ Use this checklist when publishing a new LaborSieve package version.
 
 Pick the next version before building. PyPI package versions are immutable; never reuse a version after it has been uploaded.
 
-Update both files:
+Set the version with the release helper:
 
-- `pyproject.toml`: `[project] version`
-- `labor_sieve/__init__.py`: `__version__`
+```bash
+python scripts/set-version.py 0.1.2
+```
 
-Move completed entries from `CHANGELOG.md` `Unreleased` into a versioned section.
+The helper updates `labor_sieve/__init__.py` and moves completed `CHANGELOG.md` `Unreleased` entries under the new version. `pyproject.toml` reads package metadata from `labor_sieve.__version__`.
 
 ## Build
 
@@ -33,7 +34,7 @@ python -m compileall labor_sieve tests
 python -m pytest
 
 python -m venv /tmp/labor-sieve-release-test
-/tmp/labor-sieve-release-test/bin/python -m pip install dist/labor_sieve-0.1.1-py3-none-any.whl
+/tmp/labor-sieve-release-test/bin/python -m pip install dist/labor_sieve-0.1.2-py3-none-any.whl
 /tmp/labor-sieve-release-test/bin/labor-sieve --version
 /tmp/labor-sieve-release-test/bin/labor-sieve quickstart
 /tmp/labor-sieve-release-test/bin/labor-sieve init -c /tmp/labor-sieve-config.yaml
@@ -41,7 +42,7 @@ python -m venv /tmp/labor-sieve-release-test
 /tmp/labor-sieve-release-test/bin/labor-sieve run -c /tmp/labor-sieve-config.yaml
 ```
 
-Replace `0.1.1` with the version being released.
+Replace `0.1.2` with the version being released.
 
 ## Install Paths
 
@@ -60,13 +61,13 @@ pipx upgrade labor-sieve
 Local wheel install for release testing:
 
 ```bash
-pipx install dist/labor_sieve-0.1.1-py3-none-any.whl
+pipx install dist/labor_sieve-0.1.2-py3-none-any.whl
 ```
 
 Local wheel install through the project installer:
 
 ```bash
-scripts/install.sh dist/labor_sieve-0.1.1-py3-none-any.whl
+scripts/install.sh dist/labor_sieve-0.1.2-py3-none-any.whl
 ```
 
 The repository installer script is for accessible checkouts and local artifacts. Public install instructions should use PyPI and `pipx`.
@@ -97,15 +98,15 @@ labor-sieve run -c /tmp/labor-sieve-schedule-test/config.yaml
 
 ## Publish
 
-Publish from a clean working tree after verification passes. Replace `0.1.1` with the release version.
+Publish from a clean working tree after verification passes. Replace `0.1.2` with the release version.
 
 ```bash
 git status --short
 git add .
-git commit -m "Prepare LaborSieve 0.1.1 release"
-git tag v0.1.1
+git commit -m "Prepare LaborSieve 0.1.2 release"
+git tag v0.1.2
 git push origin main
-git push origin v0.1.1
+git push origin v0.1.2
 python -m twine upload dist/*
 ```
 
@@ -113,7 +114,7 @@ After PyPI upload, verify the published package from a fresh environment:
 
 ```bash
 python -m venv /tmp/labor-sieve-pypi-test
-/tmp/labor-sieve-pypi-test/bin/python -m pip install --no-cache-dir labor-sieve==0.1.1
+/tmp/labor-sieve-pypi-test/bin/python -m pip install --no-cache-dir labor-sieve==0.1.2
 /tmp/labor-sieve-pypi-test/bin/labor-sieve --version
 /tmp/labor-sieve-pypi-test/bin/labor-sieve quickstart
 ```

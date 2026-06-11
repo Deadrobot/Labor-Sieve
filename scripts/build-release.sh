@@ -11,6 +11,15 @@ if [ -z "${PYTHON:-}" ]; then
   fi
 fi
 
+VERSION="$("$PYTHON" - <<'PY'
+from labor_sieve import __version__
+
+print(__version__)
+PY
+)"
+
+echo "Building LaborSieve $VERSION."
+
 rm -rf build dist *.egg-info
 find . -type d -name __pycache__ -prune -exec rm -rf {} +
 
@@ -29,11 +38,27 @@ fi
 
 "$PYTHON" -m build --no-isolation
 
-"$PYTHON" - <<'PY'
+"$PYTHON" - "$VERSION" <<'PY'
 from pathlib import Path
 import hashlib
+import sys
+
+version = sys.argv[1]
+expected = {
+    Path(f"dist/labor_sieve-{version}-py3-none-any.whl"),
+    Path(f"dist/labor_sieve-{version}.tar.gz"),
+}
+missing = sorted(expected - set(Path("dist").glob("*")))
+if missing:
+    print("Build did not create expected release artifacts:", file=sys.stderr)
+    for path in missing:
+        print(f"  {path}", file=sys.stderr)
+    raise SystemExit(1)
 
 for path in sorted(Path("dist").glob("*")):
+    if version not in path.name:
+        print(f"Unexpected artifact for version {version}: {path}", file=sys.stderr)
+        raise SystemExit(1)
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
     print(f"{digest}  {path}")
 PY
