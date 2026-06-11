@@ -9,6 +9,7 @@ from typing import Any
 
 from labor_sieve.config import yaml
 from labor_sieve.models import Job
+from labor_sieve.net import MAX_LOCAL_FILE_BYTES, MAX_RECORDS_PER_SOURCE
 from labor_sieve.sources.base import JobSource, SourceError
 from labor_sieve.sources.normalization import normalize_job_record
 
@@ -32,16 +33,27 @@ class LocalFileSource(JobSource):
     def _read_records(self, path: Path) -> list[dict[str, Any]]:
         if not path.exists():
             raise SourceError(f"{path} does not exist.")
+        _check_file_size(path)
         suffix = path.suffix.casefold()
         if suffix == ".csv":
             try:
                 with path.open("r", newline="", encoding="utf-8") as handle:
-                    return list(csv.DictReader(handle))
+                    records = []
+                    for index, record in enumerate(csv.DictReader(handle), start=1):
+                        if index > MAX_RECORDS_PER_SOURCE:
+                            raise SourceError(
+                                f"{path}: contains more than {MAX_RECORDS_PER_SOURCE} records."
+                            )
+                        records.append(record)
+                    return records
             except OSError as exc:
                 raise SourceError(f"{path} could not be read: {exc}") from exc
         if suffix == ".json":
             try:
-                return _extract_jobs(json.loads(path.read_text(encoding="utf-8")), path)
+                return _limit_records(
+                    _extract_jobs(json.loads(path.read_text(encoding="utf-8")), path),
+                    path,
+                )
             except OSError as exc:
                 raise SourceError(f"{path} could not be read: {exc}") from exc
             except json.JSONDecodeError as exc:
@@ -50,7 +62,10 @@ class LocalFileSource(JobSource):
             if yaml is None:
                 raise SourceError("PyYAML is required for YAML local_file sources.")
             try:
-                return _extract_jobs(yaml.safe_load(path.read_text(encoding="utf-8")), path)
+                return _limit_records(
+                    _extract_jobs(yaml.safe_load(path.read_text(encoding="utf-8")), path),
+                    path,
+                )
             except OSError as exc:
                 raise SourceError(f"{path} could not be read: {exc}") from exc
             except yaml.YAMLError as exc:
@@ -64,3 +79,18 @@ def _extract_jobs(data: Any, path: Path) -> list[dict[str, Any]]:
     if isinstance(data, dict) and isinstance(data.get("jobs"), list):
         return data["jobs"]
     raise SourceError(f"{path}: expected a list of jobs or an object with a jobs list.")
+
+
+def _check_file_size(path: Path) -> None:
+    try:
+        size = path.stat().st_size
+    except OSError as exc:
+        raise SourceError(f"{path} could not be inspected: {exc}") from exc
+    if size > MAX_LOCAL_FILE_BYTES:
+        raise SourceError(f"{path} is larger than the {MAX_LOCAL_FILE_BYTES} byte limit.")
+
+
+def _limit_records(records: list[dict[str, Any]], path: Path) -> list[dict[str, Any]]:
+    if len(records) > MAX_RECORDS_PER_SOURCE:
+        raise SourceError(f"{path}: contains more than {MAX_RECORDS_PER_SOURCE} records.")
+    return records

@@ -4,7 +4,9 @@ from pathlib import Path
 
 import pytest
 
+from labor_sieve.net import RedirectBlockedError
 from labor_sieve.sources.base import SourceError
+from labor_sieve.sources.greenhouse import GreenhouseSource
 from labor_sieve.sources.lever import LeverSource, normalize_lever_record
 from labor_sieve.sources.local_file import LocalFileSource
 from labor_sieve.sources.normalization import infer_role_family, normalize_job_record, parse_money
@@ -142,7 +144,7 @@ def test_lever_source_fetches_postings(monkeypatch):
         def __exit__(self, exc_type, exc, traceback):
             return False
 
-        def read(self):
+        def read(self, size=-1):
             return json.dumps(
                 [
                     {
@@ -155,12 +157,12 @@ def test_lever_source_fetches_postings(monkeypatch):
                 ]
             ).encode("utf-8")
 
-    def fake_urlopen(request, timeout):
+    def fake_open(request, timeout):
         assert "https://api.lever.co/v0/postings/example?mode=json" == request.full_url
         assert timeout == 7
         return FakeResponse()
 
-    monkeypatch.setattr("labor_sieve.sources.lever.urlopen", fake_urlopen)
+    monkeypatch.setattr("labor_sieve.sources.lever.open_without_redirects", fake_open)
 
     jobs = LeverSource(["example"], timeout_seconds=7).fetch()
 
@@ -185,3 +187,87 @@ def test_role_family_inference_keeps_incident_manager_operational():
 
 def test_role_family_inference_keeps_executive_roles_management():
     assert infer_role_family("VP of Infrastructure Operations and people management") == "management"
+
+
+def test_greenhouse_source_rejects_oversized_response(monkeypatch):
+    class FakeResponse:
+        headers = {"Content-Length": "11"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+        def read(self, size=-1):
+            return b"{}"
+
+    monkeypatch.setattr("labor_sieve.sources.greenhouse.MAX_REMOTE_RESPONSE_BYTES", 10)
+    monkeypatch.setattr(
+        "labor_sieve.sources.greenhouse.open_without_redirects",
+        lambda request, timeout: FakeResponse(),
+    )
+
+    with pytest.raises(SourceError, match="larger than the 10 byte limit"):
+        GreenhouseSource(["example"]).fetch()
+
+
+def test_greenhouse_source_blocks_redirects(monkeypatch):
+    def fake_open(request, timeout):
+        raise RedirectBlockedError("https://127.0.0.1/private")
+
+    monkeypatch.setattr("labor_sieve.sources.greenhouse.open_without_redirects", fake_open)
+
+    with pytest.raises(SourceError, match="redirected to https://127.0.0.1/private"):
+        GreenhouseSource(["example"]).fetch()
+
+
+def test_lever_source_blocks_redirects(monkeypatch):
+    def fake_open(request, timeout):
+        raise RedirectBlockedError("https://127.0.0.1/private")
+
+    monkeypatch.setattr("labor_sieve.sources.lever.open_without_redirects", fake_open)
+
+    with pytest.raises(SourceError, match="redirected to https://127.0.0.1/private"):
+        LeverSource(["example"]).fetch()
+
+
+def test_lever_source_rejects_excessive_records(monkeypatch):
+    class FakeResponse:
+        headers = {}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+        def read(self, size=-1):
+            return json.dumps([{"text": "one"}, {"text": "two"}]).encode("utf-8")
+
+    monkeypatch.setattr("labor_sieve.sources.lever.MAX_RECORDS_PER_SOURCE", 1)
+    monkeypatch.setattr(
+        "labor_sieve.sources.lever.open_without_redirects",
+        lambda request, timeout: FakeResponse(),
+    )
+
+    with pytest.raises(SourceError, match="more than 1 records"):
+        LeverSource(["example"]).fetch()
+
+
+def test_local_file_source_rejects_oversized_files(tmp_path, monkeypatch):
+    path = tmp_path / "jobs.json"
+    path.write_text('{"jobs": []}', encoding="utf-8")
+    monkeypatch.setattr("labor_sieve.sources.local_file.MAX_LOCAL_FILE_BYTES", 5)
+
+    with pytest.raises(SourceError, match="larger than the 5 byte limit"):
+        LocalFileSource([str(path)]).fetch()
+
+
+def test_local_file_source_rejects_excessive_csv_records(tmp_path, monkeypatch):
+    path = tmp_path / "jobs.csv"
+    path.write_text("title\none\ntwo\n", encoding="utf-8")
+    monkeypatch.setattr("labor_sieve.sources.local_file.MAX_RECORDS_PER_SOURCE", 1)
+
+    with pytest.raises(SourceError, match="contains more than 1 records"):
+        LocalFileSource([str(path)]).fetch()

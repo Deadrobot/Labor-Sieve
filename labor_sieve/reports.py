@@ -15,6 +15,9 @@ from .models import ScoredJob
 from .taxonomy import PRIORITY_BUCKETS
 
 
+CSV_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
 def write_reports(scored_jobs: list[ScoredJob], config: Config) -> dict[str, Path]:
     output_dir = Path(config.output.directory)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -153,23 +156,34 @@ def write_csv_report(scored_jobs: list[ScoredJob], path: Path) -> None:
                 {
                     "priority": item.priority,
                     "score": item.score,
-                    "title": job.title,
-                    "company": job.company,
-                    "location": job.location,
+                    "title": csv_safe_cell(job.title),
+                    "company": csv_safe_cell(job.company),
+                    "location": csv_safe_cell(job.location),
                     "remote": job.remote,
                     "hybrid": job.hybrid,
-                    "seniority": job.seniority,
-                    "role_family": job.role_family,
+                    "seniority": csv_safe_cell(job.seniority),
+                    "role_family": csv_safe_cell(job.role_family),
                     "compensation_base_min": job.compensation_base_min or "",
-                    "url": job.url,
-                    "tags": "; ".join(job.tags),
-                    "reasons": "; ".join(item.reasons),
-                    "description": job.description,
-                    "source": job.source,
-                    "source_id": job.source_id,
-                    "merged_sources": "; ".join(job.merged_sources),
+                    "url": csv_safe_cell(job.url),
+                    "tags": csv_safe_cell("; ".join(job.tags)),
+                    "reasons": csv_safe_cell("; ".join(item.reasons)),
+                    "description": csv_safe_cell(job.description),
+                    "source": csv_safe_cell(job.source),
+                    "source_id": csv_safe_cell(job.source_id),
+                    "merged_sources": csv_safe_cell("; ".join(job.merged_sources)),
                 }
             )
+
+
+def csv_safe_cell(value: str) -> str:
+    if not value:
+        return value
+    if value.startswith(CSV_FORMULA_PREFIXES):
+        return "'" + value
+    stripped = value.lstrip()
+    if stripped != value and stripped.startswith(CSV_FORMULA_PREFIXES[:4]):
+        return "'" + value
+    return value
 
 
 def render_json_report(scored_jobs: list[ScoredJob]) -> str:

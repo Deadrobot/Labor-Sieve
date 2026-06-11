@@ -1,9 +1,17 @@
+import csv
 from pathlib import Path
 
 import yaml
 
 from labor_sieve.config import config_from_data
-from labor_sieve.reports import render_html_report, render_terminal_summary, render_text_report, write_reports
+from labor_sieve.models import Job, ScoredJob
+from labor_sieve.reports import (
+    render_html_report,
+    render_terminal_summary,
+    render_text_report,
+    write_csv_report,
+    write_reports,
+)
 from labor_sieve.scoring import score_jobs
 from labor_sieve.sources.sample import SampleSource
 
@@ -69,3 +77,39 @@ def test_html_report_does_not_link_unsafe_urls(tmp_path):
 
     assert 'href="javascript:alert(1)"' not in report
     assert "javascript:alert(1)" in report
+
+
+def test_csv_report_neutralizes_formula_prefixed_cells(tmp_path):
+    path = tmp_path / "latest.csv"
+    job = Job(
+        id="1",
+        title='=HYPERLINK("http://example.invalid","click")',
+        company="@example",
+        location="+Remote",
+        remote=True,
+        hybrid=False,
+        seniority="senior",
+        role_family="sre_infra_ops",
+        compensation_base_min=None,
+        url="https://example.invalid/job",
+        description="-SUM(1,1)",
+        tags=["=tag"],
+        source="local_file",
+        source_id="=source-id",
+        merged_sources=["@merged"],
+    )
+    scored = [ScoredJob(job=job, score=100, priority="P0", reasons=["=reason"])]
+
+    write_csv_report(scored, path)
+
+    with path.open("r", newline="", encoding="utf-8") as handle:
+        row = next(csv.DictReader(handle))
+    assert row["title"].startswith("'=")
+    assert row["company"].startswith("'@")
+    assert row["location"].startswith("'+")
+    assert row["description"].startswith("'-")
+    assert row["tags"].startswith("'=")
+    assert row["reasons"].startswith("'=")
+    assert row["source_id"].startswith("'=")
+    assert row["merged_sources"].startswith("'@")
+    assert row["url"] == "https://example.invalid/job"

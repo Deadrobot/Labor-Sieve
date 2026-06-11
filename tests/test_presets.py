@@ -2,10 +2,13 @@ import hashlib
 import json
 from pathlib import Path
 
+import pytest
 import yaml
 
 from labor_sieve.config import read_yaml_file
 from labor_sieve.presets import (
+    PresetError,
+    _download_bytes,
     apply_preset_to_config,
     deep_merge,
     list_presets,
@@ -99,3 +102,12 @@ def test_update_presets_downloads_verified_file_index(tmp_path):
     assert results[0].skipped is False
     assert (destination / "field-enable.yaml").exists()
     assert (destination / "index.json").exists()
+
+
+def test_preset_download_rejects_oversized_file_uri(tmp_path, monkeypatch):
+    path = tmp_path / "large.yaml"
+    path.write_text("name: large\n", encoding="utf-8")
+    monkeypatch.setattr("labor_sieve.presets.MAX_PRESET_BYTES", 5)
+
+    with pytest.raises(PresetError, match="larger than the 5 byte limit"):
+        _download_bytes(path.as_uri(), timeout_seconds=20)

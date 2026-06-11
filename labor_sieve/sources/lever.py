@@ -5,8 +5,16 @@ from __future__ import annotations
 import json
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
-from urllib.request import Request, urlopen
+from urllib.request import Request
 
+from labor_sieve.net import (
+    MAX_RECORDS_PER_SOURCE,
+    MAX_REMOTE_RESPONSE_BYTES,
+    RedirectBlockedError,
+    ResponseTooLargeError,
+    open_without_redirects,
+    read_response_limited,
+)
 from labor_sieve.models import Job
 from labor_sieve.sources.base import JobSource, SourceError
 from labor_sieve.sources.normalization import clean_text, normalize_job_record
@@ -40,10 +48,22 @@ class LeverSource(JobSource):
         url = f"{self.base_url}/{quote(slug, safe='')}?{query}"
         request = Request(url, headers={"User-Agent": "labor-sieve/0.1"})
         try:
-            with urlopen(request, timeout=self.timeout_seconds) as response:
-                payload = json.loads(response.read().decode("utf-8"))
+            with open_without_redirects(request, self.timeout_seconds) as response:
+                content = read_response_limited(
+                    response,
+                    MAX_REMOTE_RESPONSE_BYTES,
+                    f"Lever company {slug!r} response",
+                )
+                payload = json.loads(content.decode("utf-8"))
         except UnicodeDecodeError as exc:
             raise SourceError(f"Lever company {slug!r} returned non-UTF-8 data.") from exc
+        except ResponseTooLargeError as exc:
+            raise SourceError(str(exc)) from exc
+        except RedirectBlockedError as exc:
+            detail = f" to {exc.location}" if exc.location else ""
+            raise SourceError(
+                f"Lever company {slug!r} redirected{detail}; redirects are not allowed."
+            ) from exc
         except HTTPError as exc:
             raise SourceError(f"Lever company {slug!r} returned HTTP {exc.code}.") from exc
         except URLError as exc:
@@ -55,6 +75,10 @@ class LeverSource(JobSource):
 
         if not isinstance(payload, list):
             raise SourceError(f"Lever company {slug!r} response was not a postings list.")
+        if len(payload) > MAX_RECORDS_PER_SOURCE:
+            raise SourceError(
+                f"Lever company {slug!r} returned more than {MAX_RECORDS_PER_SOURCE} records."
+            )
 
         jobs = []
         for index, record in enumerate(payload, start=1):

@@ -16,6 +16,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
+from .net import MAX_PRESET_BYTES, ResponseTooLargeError, read_response_limited
 from .config import ConfigError, read_yaml_file, validate_config_data, yaml
 
 
@@ -317,7 +318,9 @@ def _download_bytes(url: str, timeout_seconds: int) -> bytes:
     request = Request(url, headers={"User-Agent": "labor-sieve/0.1"})
     try:
         with urlopen(request, timeout=timeout_seconds) as response:
-            return response.read()
+            return read_response_limited(response, MAX_PRESET_BYTES, f"{url} response")
+    except ResponseTooLargeError as exc:
+        raise PresetError([str(exc)]) from exc
     except HTTPError as exc:
         raise PresetError([f"{url} returned HTTP {exc.code}."]) from exc
     except URLError as exc:
