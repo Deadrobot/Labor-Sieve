@@ -79,8 +79,9 @@ def test_terminal_summary_limits_p0_and_p1_output(tmp_path):
         ScoredJob(job=summary_job("p1-b"), score=84, priority="P1", reasons=[]),
     ]
 
-    summary = render_terminal_summary(scored, {}, config=config)
+    summary = render_terminal_summary(scored, {}, excluded_count=3, config=config)
 
+    assert "Excluded 3 jobs by config." in summary
     assert "p0-a at Example Co" in summary
     assert "p0-b at Example Co" not in summary
     assert "p1-a at Example Co" in summary

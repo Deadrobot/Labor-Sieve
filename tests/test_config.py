@@ -31,10 +31,13 @@ def test_example_config_is_valid():
     assert config.sources.ashby.enabled is True
     assert config.sources.workday.enabled is True
     assert config.sources.greenhouse.board_tokens == ["cloudflare", "canonical", "coreweave", "samsara"]
-    assert config.sources.lever.companies == ["palantir"]
+    assert config.sources.lever.companies == ["waabi"]
     assert config.sources.ashby.organizations == ["Lambda", "Crusoe", "Modal", "openai"]
     assert [site.company for site in config.sources.workday.sites] == ["NVIDIA", "Equinix", "Micron"]
     assert config.sources.workday.max_jobs_per_site == 100
+    assert config.exclusions.companies == []
+    assert config.exclusions.urls == []
+    assert config.exclusions.source_ids == []
     assert config.locations.local_region.center == "Richmond, VA"
     assert config.locations.local_region.radius_miles == 40
     assert "Richmond, VA" in config.locations.accepted_locations
@@ -97,6 +100,9 @@ def test_validation_accepts_configured_sources():
     data["sources"]["workday"]["timeout_seconds"] = 10
     data["sources"]["workday"]["page_size"] = 10
     data["sources"]["workday"]["max_jobs_per_site"] = 100
+    data["exclusions"]["companies"] = ["Example Co"]
+    data["exclusions"]["urls"] = ["https://example.invalid/jobs/1"]
+    data["exclusions"]["source_ids"] = ["ashby:abc"]
 
     errors = validate_config_data(data)
     config = config_from_data(data)
@@ -112,6 +118,9 @@ def test_validation_accepts_configured_sources():
     assert config.sources.workday.sites[0].company == "Example Company"
     assert config.sources.workday.page_size == 10
     assert config.sources.workday.max_jobs_per_site == 100
+    assert config.exclusions.companies == ["Example Co"]
+    assert config.exclusions.urls == ["https://example.invalid/jobs/1"]
+    assert config.exclusions.source_ids == ["ashby:abc"]
 
 
 def test_validation_requires_https_for_lever_base_url():
@@ -201,6 +210,7 @@ def test_upgrade_config_adds_missing_defaults_without_changing_existing_values(t
     data["sources"].pop("workday")
     data["locations"].pop("local_region")
     data["locations"].pop("accepted_remote_locations")
+    data.pop("exclusions")
     data["output"].pop("terminal_p0_limit")
     data["output"].pop("terminal_p1_limit")
     data["locations"]["accepted_locations"] = ["Custom, VA"]
@@ -213,6 +223,7 @@ def test_upgrade_config_adds_missing_defaults_without_changing_existing_values(t
     assert result.added_paths == [
         "locations.local_region",
         "locations.accepted_remote_locations",
+        "exclusions",
         "output.terminal_p0_limit",
         "output.terminal_p1_limit",
         "sources.remoteok",

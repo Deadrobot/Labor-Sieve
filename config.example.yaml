@@ -104,6 +104,13 @@ locations:
 compensation:
   minimum_base: 115000
 
+# Exclude companies or specific postings from all future reports.
+# Add a report URL under urls, or add "source:source_id" under source_ids.
+exclusions:
+  companies: []
+  urls: []
+  source_ids: []
+
 output:
   directory: output
   txt: true
@@ -153,7 +160,7 @@ sources:
   lever:
     enabled: true
     companies:
-      - palantir
+      - waabi
     timeout_seconds: 20
     base_url: https://api.lever.co/v0/postings
   # Public Ashby Job Posting API source. Use organization names from URLs like:

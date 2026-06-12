@@ -94,6 +94,33 @@ def test_hybrid_outside_accepted_locations_is_capped_below_p1():
     assert any("not in accepted_locations" in reason for reason in item.reasons)
 
 
+def test_on_site_outside_accepted_locations_is_capped_below_p1():
+    config = load_config()
+    item = score_job(
+        Job(
+            id="onsite-sf",
+            title="Senior Linux SRE",
+            company="Example Co",
+            location="San Francisco, CA",
+            remote=False,
+            hybrid=False,
+            seniority="senior",
+            role_family="sre_infra_ops",
+            compensation_base_min=180000,
+            url="https://example.invalid/jobs/onsite-sf",
+            description="Linux SRE incident response automation capacity planning.",
+            tags=["linux", "sre"],
+            source="test",
+            source_id="onsite-sf",
+        ),
+        config,
+    )
+
+    assert item.priority not in {"P0", "P1"}
+    assert item.score <= 64
+    assert any("outside accepted_locations" in reason for reason in item.reasons)
+
+
 def test_remote_restricted_outside_accepted_remote_locations_is_capped_below_p1():
     config = load_config()
     item = score_job(

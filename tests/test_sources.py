@@ -631,6 +631,24 @@ def test_role_family_inference_respects_out_of_scope_title_terms():
     assert infer_role_family("Sr Staff Applied Scientist", "fleet reliability capacity planning") == "software_engineering"
 
 
+def test_remote_inference_uses_location_not_description_policy_text():
+    job = normalize_job_record(
+        {
+            "id": "sf-onsite",
+            "title": "Senior Linux SRE",
+            "company": "Example Co",
+            "location": "San Francisco, CA",
+            "description": "This on-site role has a remote work policy for some teams.",
+            "url": "https://example.invalid/jobs/sf-onsite",
+        },
+        source_name="test",
+        index=1,
+    )
+
+    assert job.remote is False
+    assert job.hybrid is False
+
+
 def test_greenhouse_source_rejects_oversized_response(monkeypatch):
     class FakeResponse:
         headers = {"Content-Length": "11"}

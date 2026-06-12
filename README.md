@@ -129,6 +129,7 @@ Edit these fields in `config.yaml`:
 - `keywords.penalize`: terms that lower a match.
 - `locations`: remote support, local-region notes, and accepted hybrid/on-site locations.
 - `compensation.minimum_base`: base-pay floor, or `null` to disable it.
+- `exclusions`: companies, URLs, or source IDs to omit from future reports.
 - `output.terminal_p0_limit` and `output.terminal_p1_limit`: terminal summary limits.
 - `sources`: enabled job sources.
 
@@ -165,6 +166,22 @@ locations:
 `local_region.center` and `radius_miles` describe the intended search area. LaborSieve does not geocode locations; it matches job-posting location text against `accepted_locations`. To use another city, change the center/radius note and replace `accepted_locations` with nearby city, county, or metro strings that should count as local.
 
 Hybrid and on-site roles outside `accepted_locations` are capped below P1. Remote roles are accepted when their location is generic remote or matches `accepted_remote_locations`; remote roles restricted to other geographies are also capped below P1.
+
+### Exclusions
+
+Use `exclusions` to remove companies or specific postings from future reports:
+
+```yaml
+exclusions:
+  companies:
+    - Example Company
+  urls:
+    - https://example.invalid/jobs/job-to-hide
+  source_ids:
+    - ashby:abc123
+```
+
+Company names are matched case-insensitively. URLs are normalized before matching. Source IDs can be copied from the text report; use either the raw source ID or `source:source_id`.
 
 Download remote presets from a hosted preset index:
 

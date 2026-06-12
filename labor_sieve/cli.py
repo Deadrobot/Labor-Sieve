@@ -27,6 +27,7 @@ from .config import (
 )
 from .models import Job
 from .dedupe import dedupe_jobs
+from .exclusions import apply_exclusions
 from .presets import (
     PresetError,
     apply_preset_to_config,
@@ -347,6 +348,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         if not jobs:
             return 1
 
+    jobs, excluded_count = apply_exclusions(jobs, config)
     jobs, duplicate_count = dedupe_jobs(jobs)
     scored = score_jobs(jobs, config)
     try:
@@ -354,7 +356,15 @@ def cmd_run(args: argparse.Namespace) -> int:
     except OSError as exc:
         print_errors([f"Reports could not be written: {exc}"])
         return 1
-    print(render_terminal_summary(scored, written, config=config, duplicate_count=duplicate_count))
+    print(
+        render_terminal_summary(
+            scored,
+            written,
+            config=config,
+            duplicate_count=duplicate_count,
+            excluded_count=excluded_count,
+        )
+    )
     return 0
 
 
@@ -659,6 +669,7 @@ def quickstart_text(config_path: Path, *, include_create: bool) -> str:
             "  Remote-region settings are under locations.accepted_remote_locations.",
             "  Seniority settings are under seniority; remote/local preferences are under locations.",
             "  Compensation floor is under compensation.minimum_base.",
+            "  Company and posting exclusions are under exclusions.",
             "  Terminal summary limits are under output.terminal_p0_limit and output.terminal_p1_limit.",
             "  Broad source controls are under sources.remoteok and sources.arbeitnow.",
             "  Workday company examples are listed under sources.workday.sites.",

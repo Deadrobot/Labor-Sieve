@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.1.9
+
+- Add config-level exclusions for companies, URLs, and source IDs.
+- Replace the default Lever company with Waabi.
+- Avoid classifying on-site roles as remote based only on description policy text.
+- Include configured exclusion counts in terminal summaries.
+
 ## 0.1.8
 
 - Increase Ashby response-size headroom for large public boards while keeping a bounded source cap.

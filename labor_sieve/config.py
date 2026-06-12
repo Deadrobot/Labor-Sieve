@@ -123,6 +123,13 @@ locations:
 compensation:
   minimum_base: 115000
 
+# Exclude companies or specific postings from all future reports.
+# Add a report URL under urls, or add "source:source_id" under source_ids.
+exclusions:
+  companies: []
+  urls: []
+  source_ids: []
+
 output:
   directory: output
   txt: true
@@ -163,7 +170,7 @@ sources:
   lever:
     enabled: true
     companies:
-      - palantir
+      - waabi
     timeout_seconds: 20
     base_url: https://api.lever.co/v0/postings
   ashby:
@@ -229,6 +236,13 @@ class LocationConfig:
 @dataclass(slots=True)
 class CompensationConfig:
     minimum_base: int | None
+
+
+@dataclass(slots=True)
+class ExclusionConfig:
+    companies: list[str]
+    urls: list[str]
+    source_ids: list[str]
 
 
 @dataclass(slots=True)
@@ -327,6 +341,7 @@ class Config:
     keywords: KeywordConfig
     locations: LocationConfig
     compensation: CompensationConfig
+    exclusions: ExclusionConfig
     output: OutputConfig
     sources: SourceConfig
 
@@ -702,6 +717,12 @@ def validate_config_data(data: dict[str, Any]) -> list[str]:
             elif minimum < 0:
                 errors.append("compensation.minimum_base must be a non-negative number or null.")
 
+    exclusions = _optional_mapping(data, "exclusions", errors)
+    if exclusions is not None:
+        _require_string_list(exclusions, "companies", "exclusions.companies", errors)
+        _require_string_list(exclusions, "urls", "exclusions.urls", errors)
+        _require_string_list(exclusions, "source_ids", "exclusions.source_ids", errors)
+
     output = _require_mapping(data, "output", errors)
     if output is not None:
         if not _is_string(output.get("directory")):
@@ -782,6 +803,7 @@ def config_from_data(data: dict[str, Any]) -> Config:
     keywords = data["keywords"]
     locations = data["locations"]
     compensation = data["compensation"]
+    exclusions = data.get("exclusions", {})
     output = data["output"]
     sources = data["sources"]
     sample = sources["sample"]
@@ -819,6 +841,11 @@ def config_from_data(data: dict[str, Any]) -> Config:
                 if compensation.get("minimum_base") is None
                 else int(compensation["minimum_base"])
             ),
+        ),
+        exclusions=ExclusionConfig(
+            companies=_dedupe_strings([str(value) for value in exclusions.get("companies", [])]),
+            urls=_dedupe_strings([str(value) for value in exclusions.get("urls", [])]),
+            source_ids=_dedupe_strings([str(value) for value in exclusions.get("source_ids", [])]),
         ),
         output=OutputConfig(
             directory=str(output["directory"]),

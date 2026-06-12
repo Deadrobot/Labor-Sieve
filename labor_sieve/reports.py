@@ -48,12 +48,14 @@ def render_terminal_summary(
     scored_jobs: list[ScoredJob],
     written: dict[str, Path],
     duplicate_count: int = 0,
+    excluded_count: int = 0,
     config: Config | None = None,
 ) -> str:
     counts = bucket_counts(scored_jobs)
     lines = [
         f"Scanned {len(scored_jobs)} jobs.",
         f"Deduplicated {duplicate_count} duplicate jobs.",
+        f"Excluded {excluded_count} jobs by config.",
         "Buckets: " + " | ".join(f"{bucket} {counts[bucket]}" for bucket in PRIORITY_BUCKETS),
         "",
     ]

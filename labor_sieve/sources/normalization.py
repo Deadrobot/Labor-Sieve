@@ -59,7 +59,9 @@ def normalize_job_record(
     tags.extend(departments)
     tags.extend(offices)
 
-    text_for_inference = " ".join([title, company, location, description, " ".join(tags)])
+    tag_text = " ".join(tags)
+    text_for_inference = " ".join([title, company, location, description, tag_text])
+    location_text_for_inference = " ".join([location, tag_text])
     seniority = first_string(record, "seniority", "level") or infer_seniority(text_for_inference)
     if seniority not in SENIORITY_LEVELS:
         seniority = infer_seniority(text_for_inference)
@@ -70,10 +72,10 @@ def normalize_job_record(
 
     remote = first_bool(record, "remote")
     if remote is None:
-        remote = infer_remote(text_for_inference)
+        remote = infer_remote(location_text_for_inference)
     hybrid = first_bool(record, "hybrid")
     if hybrid is None:
-        hybrid = infer_hybrid(text_for_inference)
+        hybrid = infer_hybrid(location_text_for_inference)
 
     job_id = first_string(record, "id", "job_id", "requisition_id", "internal_job_id")
     if not job_id:
