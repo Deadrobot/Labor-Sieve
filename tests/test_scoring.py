@@ -94,6 +94,33 @@ def test_hybrid_outside_accepted_locations_is_capped_below_p1():
     assert any("not in accepted_locations" in reason for reason in item.reasons)
 
 
+def test_hybrid_remote_outside_accepted_locations_is_capped_below_p1():
+    config = load_config()
+    item = score_job(
+        Job(
+            id="remote-hybrid-sf",
+            title="Senior Linux SRE",
+            company="Example Co",
+            location="Remote / Hybrid - San Francisco, CA",
+            remote=True,
+            hybrid=True,
+            seniority="senior",
+            role_family="sre_infra_ops",
+            compensation_base_min=180000,
+            url="https://example.invalid/jobs/remote-hybrid-sf",
+            description="Linux SRE incident response automation capacity planning.",
+            tags=["linux", "sre"],
+            source="test",
+            source_id="remote-hybrid-sf",
+        ),
+        config,
+    )
+
+    assert item.priority not in {"P0", "P1"}
+    assert item.score <= 64
+    assert any("hybrid location" in reason and "not in accepted_locations" in reason for reason in item.reasons)
+
+
 def test_on_site_outside_accepted_locations_is_capped_below_p1():
     config = load_config()
     item = score_job(
@@ -227,6 +254,33 @@ def test_scientist_title_is_capped_below_p1():
     assert item.priority not in {"P0", "P1"}
     assert item.score <= 64
     assert any("scientist title matched" in reason for reason in item.reasons)
+
+
+def test_networking_role_family_is_capped_below_p1_by_default():
+    config = load_config()
+    item = score_job(
+        Job(
+            id="network-engineer",
+            title="Staff Network Engineer, Deployment",
+            company="Example Co",
+            location="Remote - United States",
+            remote=True,
+            hybrid=False,
+            seniority="staff",
+            role_family="networking",
+            compensation_base_min=220000,
+            url="https://example.invalid/jobs/network-engineer",
+            description="Data center hardware fleet reliability automation.",
+            tags=["data center", "hardware", "fleet"],
+            source="test",
+            source_id="network-engineer",
+        ),
+        config,
+    )
+
+    assert item.priority not in {"P0", "P1"}
+    assert item.score <= 64
+    assert any("networking role family is low-weighted" in reason for reason in item.reasons)
 
 
 def test_manager_title_is_rejected_by_default():

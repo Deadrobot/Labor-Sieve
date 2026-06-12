@@ -38,6 +38,7 @@ def test_example_config_is_valid():
     assert config.exclusions.companies == []
     assert config.exclusions.urls == []
     assert config.exclusions.source_ids == []
+    assert config.role_family_weights["networking"] == 0.25
     assert config.locations.local_region.center == "Richmond, VA"
     assert config.locations.local_region.radius_miles == 40
     assert "Richmond, VA" in config.locations.accepted_locations
@@ -61,6 +62,7 @@ def test_validation_reports_seniority_order_error():
 def test_validation_allows_custom_role_family_weights():
     data = load_example()
     data["role_family_weights"]["field_enablement"] = 0.72
+    data["role_family_weights"]["networking"] = 0.4
 
     errors = validate_config_data(data)
 

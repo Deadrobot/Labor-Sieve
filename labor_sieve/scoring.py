@@ -106,6 +106,17 @@ def _seniority_points(job: Job, config: Config, reasons: list[str]) -> float:
 
 
 def _location_points_and_cap(job: Job, config: Config, reasons: list[str]) -> tuple[float, float]:
+    local_region = (
+        f"{config.locations.local_region.center} "
+        f"within {config.locations.local_region.radius_miles} miles"
+    )
+    if job.hybrid:
+        if _location_matches(job.location, config.locations.accepted_locations):
+            reasons.append(f"hybrid location {job.location} accepted for {local_region}; +8")
+            return 8, 100
+        reasons.append(f"hybrid location {job.location} is not in accepted_locations; capped below P1")
+        return 0, 64
+
     if job.remote:
         if config.locations.remote:
             if _remote_location_allowed(job.location, config):
@@ -118,20 +129,9 @@ def _location_points_and_cap(job: Job, config: Config, reasons: list[str]) -> tu
         reasons.append("remote role but remote is disabled; capped below P1")
         return 0, 64
 
-    local_region = (
-        f"{config.locations.local_region.center} "
-        f"within {config.locations.local_region.radius_miles} miles"
-    )
     if _location_matches(job.location, config.locations.accepted_locations):
-        if job.hybrid:
-            reasons.append(f"hybrid location {job.location} accepted for {local_region}; +8")
-            return 8, 100
         reasons.append(f"local on-site location {job.location} accepted for {local_region}; +6")
         return 6, 100
-
-    if job.hybrid:
-        reasons.append(f"hybrid location {job.location} is not in accepted_locations; capped below P1")
-        return 0, 64
 
     reasons.append("on-site or unspecified location outside accepted_locations; capped below P1")
     return 0, 64
@@ -194,6 +194,9 @@ def _title_scope_cap(job: Job, role_weight: float, reasons: list[str]) -> float:
     if job.role_family == "software_engineering" and role_weight <= 0.25:
         cap = min(cap, 64)
         reasons.append("software engineering role family is low-weighted; capped below P1")
+    if job.role_family == "networking" and role_weight <= 0.35:
+        cap = min(cap, 64)
+        reasons.append("networking role family is low-weighted; capped below P1")
     if re.search(r"\b(manager|director|vp|vice president|head of|chief)\b", title):
         cap = min(cap, 49)
         reasons.append("management title term matched; capped below P3")

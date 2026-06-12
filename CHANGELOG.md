@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.1.10
+
+- Treat postings marked both remote and hybrid as hybrid for location scoring.
+- Add a low-weight networking role family for network-specific titles.
+- Cap low-weight networking roles below P1 by default.
+
 ## 0.1.9
 
 - Add config-level exclusions for companies, URLs, and source IDs.

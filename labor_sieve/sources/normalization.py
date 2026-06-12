@@ -76,6 +76,7 @@ def normalize_job_record(
     hybrid = first_bool(record, "hybrid")
     if hybrid is None:
         hybrid = infer_hybrid(location_text_for_inference)
+    remote, hybrid = resolve_workplace_flags(remote, hybrid)
 
     job_id = first_string(record, "id", "job_id", "requisition_id", "internal_job_id")
     if not job_id:
@@ -244,6 +245,12 @@ def infer_hybrid(text: str) -> bool:
     return "hybrid" in text.casefold()
 
 
+def resolve_workplace_flags(remote: bool, hybrid: bool) -> tuple[bool, bool]:
+    if remote and hybrid:
+        return False, True
+    return remote, hybrid
+
+
 def infer_seniority(text: str) -> str:
     normalized = text.casefold()
     if re.search(r"\b(vp|vice president|chief|cxo|executive)\b", normalized):
@@ -282,6 +289,11 @@ def infer_role_family(title: str, text: str = "") -> str:
         normalized_title,
     ):
         return "software_engineering"
+    if re.search(
+        r"\b(network engineer|network deployment|network operations|network technician|network administrator)\b",
+        normalized_title,
+    ):
+        return "networking"
     if any(term in normalized_title for term in ("data center", "datacenter", "hardware", "rack", "diagnostic")):
         return "data_center_ops"
     if any(term in normalized_title for term in ("logistics", "process improvement", "workflow")):

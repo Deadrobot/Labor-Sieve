@@ -33,7 +33,7 @@ seniority:
 # Built-in role family values:
 # sre_infra_ops, data_center_ops, fleet_reliability, platform_ops,
 # implementation_support, logistics_process, customer_operations,
-# software_engineering, architect, management, unknown
+# networking, software_engineering, architect, management, unknown
 #
 # Custom snake_case role families are valid. The scorer uses the configured
 # weight for matching role_family values emitted by sources or presets.
@@ -45,6 +45,7 @@ role_family_weights:
   implementation_support: 0.45
   logistics_process: 0.75
   customer_operations: 0.50
+  networking: 0.25
   architect: 0.35
   management: 0.15
   software_engineering: 0.10

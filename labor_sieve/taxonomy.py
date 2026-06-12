@@ -18,6 +18,7 @@ ROLE_FAMILIES = (
     "implementation_support",
     "logistics_process",
     "customer_operations",
+    "networking",
     "software_engineering",
     "architect",
     "management",

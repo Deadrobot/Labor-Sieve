@@ -165,7 +165,9 @@ locations:
 
 `local_region.center` and `radius_miles` describe the intended search area. LaborSieve does not geocode locations; it matches job-posting location text against `accepted_locations`. To use another city, change the center/radius note and replace `accepted_locations` with nearby city, county, or metro strings that should count as local.
 
-Hybrid and on-site roles outside `accepted_locations` are capped below P1. Remote roles are accepted when their location is generic remote or matches `accepted_remote_locations`; remote roles restricted to other geographies are also capped below P1.
+Hybrid and on-site roles outside `accepted_locations` are capped below P1. Remote roles are accepted when their location is generic remote or matches `accepted_remote_locations`; remote roles restricted to other geographies are also capped below P1. If a posting is marked both remote and hybrid, LaborSieve treats it as hybrid so local-region rules apply.
+
+Network-specific titles are assigned to the `networking` role family. The default weight is intentionally low; raise `role_family_weights.networking` if those roles should rank higher.
 
 ### Exclusions
 

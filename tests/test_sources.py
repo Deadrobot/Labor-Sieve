@@ -12,7 +12,7 @@ from labor_sieve.sources.base import SourceError
 from labor_sieve.sources.greenhouse import GreenhouseSource
 from labor_sieve.sources.lever import LeverSource, normalize_lever_record
 from labor_sieve.sources.local_file import LocalFileSource
-from labor_sieve.sources.normalization import infer_role_family, normalize_job_record, parse_money
+from labor_sieve.sources.normalization import infer_role_family, normalize_job_record, parse_money, resolve_workplace_flags
 from labor_sieve.sources.remoteok import RemoteOkSource
 from labor_sieve.sources.workday import WorkdaySite, WorkdaySource, normalize_workday_record, parse_workday_site
 
@@ -629,6 +629,27 @@ def test_role_family_inference_keeps_executive_roles_management():
 def test_role_family_inference_respects_out_of_scope_title_terms():
     assert infer_role_family("Sales Engineer I", "fleet hardware customer operations") == "customer_operations"
     assert infer_role_family("Sr Staff Applied Scientist", "fleet reliability capacity planning") == "software_engineering"
+    assert infer_role_family("Staff Network Engineer, Deployment", "data center hardware") == "networking"
+
+
+def test_hybrid_overrides_remote_when_both_are_present():
+    assert resolve_workplace_flags(True, True) == (False, True)
+
+    job = normalize_job_record(
+        {
+            "id": "remote-hybrid-sf",
+            "title": "Senior Linux SRE",
+            "company": "Example Co",
+            "location": "Remote / Hybrid - San Francisco, CA",
+            "description": "Linux operations.",
+            "url": "https://example.invalid/jobs/remote-hybrid-sf",
+        },
+        source_name="test",
+        index=1,
+    )
+
+    assert job.remote is False
+    assert job.hybrid is True
 
 
 def test_remote_inference_uses_location_not_description_policy_text():
