@@ -175,6 +175,118 @@ def test_fleet_operations_engineer_reaches_p0_when_location_matches():
     assert any("fleet operations title focus" in reason for reason in item.reasons)
 
 
+def test_site_reliability_engineer_reaches_p1_with_default_remote_us_scope():
+    config = load_config()
+    item = score_job(
+        Job(
+            id="site-reliability-engineer",
+            title="Site Reliability Engineer",
+            company="Example Co",
+            location="Remote - United States",
+            remote=True,
+            hybrid=False,
+            seniority="mid",
+            role_family="sre_infra_ops",
+            compensation_base_min=None,
+            url="https://example.invalid/jobs/site-reliability-engineer",
+            description="Hardware infrastructure operations, incident response, automation, and reliability.",
+            tags=["Hardware Infrastructure"],
+            source="test",
+            source_id="site-reliability-engineer",
+        ),
+        config,
+    )
+
+    assert item.priority in {"P0", "P1"}
+    assert item.score >= 80
+    assert any("site reliability title focus" in reason for reason in item.reasons)
+
+
+def test_language_requirement_penalizes_unaccepted_bilingual_role():
+    config = load_config()
+    item = score_job(
+        Job(
+            id="bilingual-integration",
+            title="Solutions Integration Engineer",
+            company="Example Co",
+            location="Remote - US",
+            remote=True,
+            hybrid=False,
+            seniority="senior",
+            role_family="data_center_ops",
+            compensation_base_min=None,
+            url="https://example.invalid/jobs/bilingual-integration",
+            description=(
+                "Bilingual speakers are required, ideally in Spanish. "
+                "Customer implementation, troubleshooting, data center hardware integrations, and operations support."
+            ),
+            tags=["implementation", "hardware"],
+            source="test",
+            source_id="bilingual-integration",
+        ),
+        config,
+    )
+
+    assert item.priority not in {"P0", "P1"}
+    assert any("language requirement -8" in reason for reason in item.reasons)
+
+
+def test_language_requirement_accepts_configured_language():
+    config = load_config()
+    config.language_requirements.accepted.append("spanish")
+    item = score_job(
+        Job(
+            id="spanish-accepted",
+            title="Solutions Integration Engineer",
+            company="Example Co",
+            location="Remote - US",
+            remote=True,
+            hybrid=False,
+            seniority="senior",
+            role_family="data_center_ops",
+            compensation_base_min=None,
+            url="https://example.invalid/jobs/spanish-accepted",
+            description=(
+                "Bilingual speakers are required, ideally in Spanish. "
+                "Customer implementation, troubleshooting, data center hardware integrations, and operations support."
+            ),
+            tags=["implementation", "hardware"],
+            source="test",
+            source_id="spanish-accepted",
+        ),
+        config,
+    )
+
+    assert not any("language requirement" in reason for reason in item.reasons)
+
+
+def test_language_requirement_boosts_configured_language():
+    config = load_config()
+    config.language_requirements.boost.append("korean")
+    item = score_job(
+        Job(
+            id="korean-boosted",
+            title="Operations Reliability Engineer",
+            company="Example Co",
+            location="Remote - US",
+            remote=True,
+            hybrid=False,
+            seniority="mid",
+            role_family="fleet_reliability",
+            compensation_base_min=None,
+            url="https://example.invalid/jobs/korean-boosted",
+            description="Korean language fluency preferred. Fleet reliability, automation, and troubleshooting.",
+            tags=["fleet", "reliability"],
+            source="test",
+            source_id="korean-boosted",
+        ),
+        config,
+    )
+
+    assert any("language preference +6: korean" in reason for reason in item.reasons)
+    assert not any("language requirement" in reason for reason in item.reasons)
+
+
 def test_remote_restricted_outside_accepted_remote_locations_is_capped_below_p1():
     config = load_config()
     item = score_job(
@@ -389,6 +501,33 @@ def test_service_desk_title_is_capped_below_p1():
     assert item.priority not in {"P0", "P1"}
     assert item.score <= 64
     assert any("service desk title matched" in reason for reason in item.reasons)
+
+
+def test_manufacturing_engineering_title_is_capped_below_p1():
+    config = load_config()
+    item = score_job(
+        Job(
+            id="manufacturing-test",
+            title="Manufacturing Test Engineer, AI Compute Infrastructure",
+            company="Example Co",
+            location="Remote - United States",
+            remote=True,
+            hybrid=False,
+            seniority="senior",
+            role_family="platform_ops",
+            compensation_base_min=205000,
+            url="https://example.invalid/jobs/manufacturing-test",
+            description="AI compute infrastructure, hardware automation, and reliability.",
+            tags=["hardware", "infrastructure"],
+            source="test",
+            source_id="manufacturing-test",
+        ),
+        config,
+    )
+
+    assert item.priority not in {"P0", "P1"}
+    assert item.score <= 64
+    assert any("manufacturing engineering title matched" in reason for reason in item.reasons)
 
 
 def test_staff_roles_are_above_default_seniority_range():

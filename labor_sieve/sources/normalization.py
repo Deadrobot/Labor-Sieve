@@ -54,6 +54,9 @@ def normalize_job_record(
     categories = normalize_category_tags(record.get("categories"))
     tags.extend(categories)
 
+    metadata = normalize_metadata_tags(record.get("metadata"))
+    tags.extend(metadata)
+
     departments = normalize_name_list(record.get("departments"))
     offices = normalize_name_list(record.get("offices"))
     tags.extend(departments)
@@ -184,6 +187,31 @@ def normalize_category_tags(value: Any) -> list[str]:
         if item not in (None, ""):
             tags.append(str(item).strip())
     return [tag for tag in tags if tag]
+
+
+def normalize_metadata_tags(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    tags = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        tags.extend(_metadata_value_tags(item.get("value")))
+    return [tag for tag in tags if tag]
+
+
+def _metadata_value_tags(value: Any) -> list[str]:
+    if value in (None, ""):
+        return []
+    if isinstance(value, list):
+        tags = []
+        for item in value:
+            tags.extend(_metadata_value_tags(item))
+        return tags
+    if isinstance(value, dict):
+        name = value.get("name") or value.get("label") or value.get("value")
+        return [str(name).strip()] if name not in (None, "") else []
+    return [str(value).strip()]
 
 
 def parse_bool(value: Any) -> bool:

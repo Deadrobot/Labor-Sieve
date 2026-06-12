@@ -57,7 +57,12 @@ keywords:
     - production operations
     - incident response
     - sre
+    - site reliability
+    - operations engineer
+    - operations reliability
+    - fleet reliability
     - reliability
+    - data center operations
     - automation
     - capacity planning
     - data center
@@ -84,6 +89,16 @@ keywords:
     - vp
     - head of
     - people management
+
+# Penalize explicit language requirements unless the language is listed here.
+# Add languages you can use professionally, such as spanish or korean.
+# Add languages under boost when you want those requirements prioritized.
+language_requirements:
+  accepted:
+    - english
+  boost: []
+  penalty: 8
+  boost_points: 6
 
 locations:
   remote: true
@@ -167,6 +182,7 @@ sources:
       - canonical
       - coreweave
       - samsara
+      - nebius
     timeout_seconds: 20
   lever:
     enabled: true
@@ -218,6 +234,14 @@ class SeniorityConfig:
 class KeywordConfig:
     boost: list[str]
     penalize: list[str]
+
+
+@dataclass(slots=True)
+class LanguageRequirementConfig:
+    accepted: list[str]
+    boost: list[str]
+    penalty: int
+    boost_points: int
 
 
 @dataclass(slots=True)
@@ -340,6 +364,7 @@ class Config:
     seniority: SeniorityConfig
     role_family_weights: dict[str, float]
     keywords: KeywordConfig
+    language_requirements: LanguageRequirementConfig
     locations: LocationConfig
     compensation: CompensationConfig
     exclusions: ExclusionConfig
@@ -675,6 +700,38 @@ def validate_config_data(data: dict[str, Any]) -> list[str]:
         _require_string_list(keywords, "boost", "keywords.boost", errors)
         _require_string_list(keywords, "penalize", "keywords.penalize", errors)
 
+    language_requirements = _optional_mapping(
+        data,
+        "language_requirements",
+        errors,
+        label="language_requirements",
+    )
+    if language_requirements is not None:
+        _require_string_list(
+            language_requirements,
+            "accepted",
+            "language_requirements.accepted",
+            errors,
+        )
+        _require_string_list(
+            language_requirements,
+            "boost",
+            "language_requirements.boost",
+            errors,
+        )
+        _require_non_negative_int(
+            language_requirements,
+            "penalty",
+            "language_requirements.penalty",
+            errors,
+        )
+        _require_non_negative_int(
+            language_requirements,
+            "boost_points",
+            "language_requirements.boost_points",
+            errors,
+        )
+
     locations = _require_mapping(data, "locations", errors)
     if locations is not None:
         _require_bool(locations, "remote", "locations.remote", errors)
@@ -802,6 +859,7 @@ def validate_config_data(data: dict[str, Any]) -> list[str]:
 def config_from_data(data: dict[str, Any]) -> Config:
     seniority = data["seniority"]
     keywords = data["keywords"]
+    language_requirements = data.get("language_requirements", {})
     locations = data["locations"]
     compensation = data["compensation"]
     exclusions = data.get("exclusions", {})
@@ -826,6 +884,12 @@ def config_from_data(data: dict[str, Any]) -> Config:
         keywords=KeywordConfig(
             boost=[str(value) for value in keywords["boost"]],
             penalize=[str(value) for value in keywords["penalize"]],
+        ),
+        language_requirements=LanguageRequirementConfig(
+            accepted=[str(value) for value in language_requirements.get("accepted", [])],
+            boost=[str(value) for value in language_requirements.get("boost", [])],
+            penalty=int(language_requirements.get("penalty", 8)),
+            boost_points=int(language_requirements.get("boost_points", 6)),
         ),
         locations=LocationConfig(
             remote=bool(locations["remote"]),
@@ -998,6 +1062,12 @@ def _require_positive_int(mapping: dict[str, Any], key: str, label: str, errors:
     value = mapping.get(key)
     if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
         errors.append(f"{label} must be a positive integer.")
+
+
+def _require_non_negative_int(mapping: dict[str, Any], key: str, label: str, errors: list[str]) -> None:
+    value = mapping.get(key)
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        errors.append(f"{label} must be a non-negative integer.")
 
 
 def _require_int_range(

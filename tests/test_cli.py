@@ -32,13 +32,17 @@ def test_quickstart_prints_first_run_steps(tmp_path, monkeypatch, capsys):
     assert "Created" in output
     assert f"Config file: {expected_config}" in output
     assert "labor-sieve init -c" not in output
-    assert "Set location, seniority, remote/on-site, compensation, keywords, and sources." in output
+    assert (
+        "Set location, seniority, remote/on-site, compensation, keywords, "
+        "language requirements, and sources."
+    ) in output
     assert "Validate it: labor-sieve validate-config" in output
     assert "Run a scan: labor-sieve run" in output
     assert "Public remote and configured ATS sources are enabled by default; sample data is disabled." in output
     assert "locations.local_region" in output
     assert "locations.accepted_locations" in output
     assert "compensation.minimum_base" in output
+    assert "language_requirements" in output
     assert "Company and posting exclusions are under exclusions." in output
     assert "sources.workday.sites" in output
     assert "sources.remoteok" in output

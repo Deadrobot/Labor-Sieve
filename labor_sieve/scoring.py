@@ -9,6 +9,52 @@ from .models import Job, ScoredJob
 from .taxonomy import SENIORITY_LEVELS, seniority_index
 
 
+LANGUAGE_REQUIREMENT_TERMS = (
+    "bilingual",
+    "multilingual",
+    "spanish",
+    "french",
+    "german",
+    "portuguese",
+    "mandarin",
+    "cantonese",
+    "chinese",
+    "japanese",
+    "korean",
+    "dutch",
+    "hebrew",
+    "arabic",
+    "italian",
+    "polish",
+    "czech",
+    "finnish",
+    "swedish",
+    "norwegian",
+    "danish",
+    "hindi",
+)
+
+LANGUAGE_REQUIREMENT_CONTEXT = (
+    "required",
+    "requirements",
+    "requirement",
+    "preferred",
+    "fluency",
+    "fluent",
+    "proficiency",
+    "proficient",
+    "speaker",
+    "speaking",
+    "language",
+    "verbal",
+    "written",
+    "must",
+    "need",
+    "needs",
+    "native",
+)
+
+
 def priority_bucket(score: int) -> str:
     if score >= 90:
         return "P0"
@@ -62,6 +108,8 @@ def score_job(job: Job, config: Config) -> ScoredJob:
         score -= penalty_points
         reasons.append(f"penalty keywords -{penalty_points}: {', '.join(penalty_matches)}")
 
+    score += _language_requirement_points(job, config, reasons)
+
     title_cap = _title_scope_cap(job, role_weight, reasons)
     score_cap = min(score_cap, title_cap)
     if job.seniority == "principal" and not config.seniority.allow_principal:
@@ -109,6 +157,9 @@ def _seniority_points(job: Job, config: Config, reasons: list[str]) -> float:
 
 def _title_focus_points(job: Job, reasons: list[str]) -> float:
     title = job.title.casefold()
+    if re.search(r"\b(site reliability engineer|sre)\b", title):
+        reasons.append("site reliability title focus +8")
+        return 8
     if re.search(r"\boperations engineer\b", title) and re.search(r"\bfleet reliability\b|\breliability\b", title):
         reasons.append("fleet operations title focus +8")
         return 8
@@ -198,6 +249,90 @@ def _compensation_points(job: Job, config: Config, reasons: list[str]) -> float:
     return -15
 
 
+def _language_requirement_points(job: Job, config: Config, reasons: list[str]) -> float:
+    penalty = config.language_requirements.penalty
+    accepted = {
+        _normalize_language_term(language)
+        for language in config.language_requirements.accepted
+        if language.strip()
+    }
+    boosted = {
+        _normalize_language_term(language)
+        for language in config.language_requirements.boost
+        if language.strip()
+    }
+    allowed = accepted | boosted
+    detected = _language_requirement_matches(_job_text(job))
+    if not detected:
+        return 0
+
+    allowed_matches = [
+        match
+        for match in detected
+        if _normalize_language_term(match) in allowed
+    ]
+    boost_matches = [
+        match
+        for match in detected
+        if _normalize_language_term(match) in boosted
+    ]
+    penalty_matches = [
+        match
+        for match in detected
+        if _should_penalize_language_requirement(match, allowed, allowed_matches)
+    ]
+
+    points = 0
+    if boost_matches and config.language_requirements.boost_points > 0:
+        points += config.language_requirements.boost_points
+        reasons.append(
+            f"language preference +{config.language_requirements.boost_points}: "
+            + ", ".join(boost_matches)
+        )
+    if penalty_matches and penalty > 0:
+        points -= penalty
+        reasons.append(f"language requirement -{penalty}: {', '.join(penalty_matches)}")
+    return points
+
+
+def _should_penalize_language_requirement(
+    match: str,
+    allowed: set[str],
+    allowed_matches: list[str],
+) -> bool:
+    normalized = _normalize_language_term(match)
+    if normalized in allowed:
+        return False
+    if normalized in {"bilingual", "multilingual"} and allowed_matches:
+        return False
+    return True
+
+
+def _language_requirement_matches(text: str) -> list[str]:
+    matches = []
+    for term in LANGUAGE_REQUIREMENT_TERMS:
+        if _has_language_requirement_context(text, term):
+            matches.append(term)
+    return matches
+
+
+def _has_language_requirement_context(text: str, term: str) -> bool:
+    term_pattern = _language_term_pattern(term)
+    context_pattern = r"\b(" + "|".join(re.escape(value) for value in LANGUAGE_REQUIREMENT_CONTEXT) + r")\b"
+    return bool(
+        re.search(term_pattern + r".{0,120}" + context_pattern, text, flags=re.DOTALL)
+        or re.search(context_pattern + r".{0,120}" + term_pattern, text, flags=re.DOTALL)
+    )
+
+
+def _language_term_pattern(term: str) -> str:
+    return r"\b" + re.escape(term.casefold()).replace(r"\ ", r"[-\s]+") + r"\b"
+
+
+def _normalize_language_term(term: str) -> str:
+    return re.sub(r"\s+", " ", term.casefold().strip())
+
+
 def _title_scope_cap(job: Job, role_weight: float, reasons: list[str]) -> float:
     title = job.title.casefold()
     cap = 100.0
@@ -219,6 +354,9 @@ def _title_scope_cap(job: Job, role_weight: float, reasons: list[str]) -> float:
     if re.search(r"\b(service desk|help desk|desktop support)\b", title):
         cap = min(cap, 64)
         reasons.append("service desk title matched; capped below P1")
+    if re.search(r"\b(manufacturing test engineer|manufacturing engineer)\b", title):
+        cap = min(cap, 64)
+        reasons.append("manufacturing engineering title matched; capped below P1")
     if re.search(r"\b(manager|director|vp|vice president|head of|chief)\b", title):
         cap = min(cap, 49)
         reasons.append("management title term matched; capped below P3")

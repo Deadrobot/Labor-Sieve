@@ -31,7 +31,13 @@ def test_example_config_is_valid():
     assert config.sources.lever.enabled is True
     assert config.sources.ashby.enabled is True
     assert config.sources.workday.enabled is True
-    assert config.sources.greenhouse.board_tokens == ["cloudflare", "canonical", "coreweave", "samsara"]
+    assert config.sources.greenhouse.board_tokens == [
+        "cloudflare",
+        "canonical",
+        "coreweave",
+        "samsara",
+        "nebius",
+    ]
     assert config.sources.lever.companies == ["waabi"]
     assert config.sources.ashby.organizations == ["Lambda", "Crusoe", "Modal", "openai"]
     assert [site.company for site in config.sources.workday.sites] == ["NVIDIA", "Equinix", "Micron"]
@@ -48,6 +54,10 @@ def test_example_config_is_valid():
     assert config.output.terminal_p0_limit == 10
     assert config.output.terminal_p1_limit == 15
     assert config.sources.ashby.timeout_seconds == 30
+    assert config.language_requirements.accepted == ["english"]
+    assert config.language_requirements.boost == []
+    assert config.language_requirements.penalty == 8
+    assert config.language_requirements.boost_points == 6
 
 
 def test_validation_reports_seniority_order_error():
@@ -124,6 +134,36 @@ def test_validation_accepts_configured_sources():
     assert config.exclusions.companies == ["Example Co"]
     assert config.exclusions.urls == ["https://example.invalid/jobs/1"]
     assert config.exclusions.source_ids == ["ashby:abc"]
+
+
+def test_validation_accepts_language_requirement_preferences():
+    data = load_example()
+    data["language_requirements"] = {
+        "accepted": ["english", "spanish"],
+        "boost": ["korean"],
+        "penalty": 5,
+        "boost_points": 7,
+    }
+
+    errors = validate_config_data(data)
+    config = config_from_data(data)
+
+    assert errors == []
+    assert config.language_requirements.accepted == ["english", "spanish"]
+    assert config.language_requirements.boost == ["korean"]
+    assert config.language_requirements.penalty == 5
+    assert config.language_requirements.boost_points == 7
+
+
+def test_validation_reports_invalid_language_requirement_points():
+    data = load_example()
+    data["language_requirements"]["penalty"] = -1
+    data["language_requirements"]["boost_points"] = "high"
+
+    errors = validate_config_data(data)
+
+    assert "language_requirements.penalty must be a non-negative integer." in errors
+    assert "language_requirements.boost_points must be a non-negative integer." in errors
 
 
 def test_validation_requires_https_for_lever_base_url():
@@ -211,6 +251,7 @@ def test_upgrade_config_adds_missing_defaults_without_changing_existing_values(t
     data["sources"].pop("arbeitnow")
     data["sources"].pop("ashby")
     data["sources"].pop("workday")
+    data.pop("language_requirements")
     data["locations"].pop("local_region")
     data["locations"].pop("accepted_remote_locations")
     data.pop("exclusions")
@@ -224,6 +265,7 @@ def test_upgrade_config_adds_missing_defaults_without_changing_existing_values(t
     upgraded = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     assert result.changed is True
     assert result.added_paths == [
+        "language_requirements",
         "locations.local_region",
         "locations.accepted_remote_locations",
         "exclusions",
@@ -239,6 +281,8 @@ def test_upgrade_config_adds_missing_defaults_without_changing_existing_values(t
     assert upgraded["sources"]["sample"]["enabled"] is True
     assert upgraded["sources"]["greenhouse"]["board_tokens"] == ["custom-board"]
     assert upgraded["locations"]["accepted_locations"] == ["Custom, VA"]
+    assert upgraded["language_requirements"]["accepted"] == ["english"]
+    assert upgraded["language_requirements"]["boost"] == []
     assert upgraded["locations"]["local_region"]["center"] == "Richmond, VA"
     assert "United States" in upgraded["locations"]["accepted_remote_locations"]
     assert upgraded["output"]["terminal_p0_limit"] == 10

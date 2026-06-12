@@ -657,7 +657,7 @@ def quickstart_text(config_path: Path, *, include_create: bool) -> str:
         [
             "Next steps:",
             f"  1. Edit the config file with your preferred editor: {_quote(config_path)}",
-            "  2. Set location, seniority, remote/on-site, compensation, keywords, and sources.",
+            "  2. Set location, seniority, remote/on-site, compensation, keywords, language requirements, and sources.",
             f"  3. Validate it: {validate_command}",
             f"  4. Run a scan: {run_command}",
             f"  5. Read the text report: {_quote(str(output_dir / 'latest.txt'))}",
@@ -669,6 +669,7 @@ def quickstart_text(config_path: Path, *, include_create: bool) -> str:
             "  Remote-region settings are under locations.accepted_remote_locations.",
             "  Seniority settings are under seniority; remote/local preferences are under locations.",
             "  Compensation floor is under compensation.minimum_base.",
+            "  Language requirement preferences are under language_requirements.",
             "  Company and posting exclusions are under exclusions.",
             "  Terminal summary limits are under output.terminal_p0_limit and output.terminal_p1_limit.",
             "  Broad source controls are under sources.remoteok and sources.arbeitnow.",

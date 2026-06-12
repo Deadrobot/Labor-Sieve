@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.1.12
+
+- Add configurable language requirement penalties and boosts.
+- Add Nebius to the default Greenhouse starter list.
+- Include Greenhouse metadata values in normalized job tags.
+- Boost site reliability titles and default keyword coverage for operations reliability roles.
+- Cap manufacturing engineering titles below P1 by default.
+
 ## 0.1.11
 
 - Set default maximum seniority to senior.

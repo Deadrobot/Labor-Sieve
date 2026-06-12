@@ -101,6 +101,7 @@ def test_normalization_handles_greenhouse_style_record():
             "location": {"name": "Seattle"},
             "absolute_url": "https://example.invalid/gh/123",
             "content": "<p>Hardware diagnostics and data center reliability.</p>",
+            "metadata": [{"name": "Job Category", "value": "Hardware Infrastructure"}],
             "departments": [{"name": "Infrastructure"}],
         },
         source_name="greenhouse-example",
@@ -113,6 +114,7 @@ def test_normalization_handles_greenhouse_style_record():
     assert job.location == "Seattle"
     assert job.seniority == "senior"
     assert job.role_family == "data_center_ops"
+    assert "Hardware Infrastructure" in job.tags
     assert "Infrastructure" in job.tags
 
 

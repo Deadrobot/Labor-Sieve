@@ -36,7 +36,12 @@ keywords:
     - production operations
     - incident response
     - sre
+    - site reliability
+    - operations engineer
+    - operations reliability
+    - fleet reliability
     - reliability
+    - data center operations
     - automation
     - capacity planning
     - data center
@@ -63,6 +68,16 @@ keywords:
     - vp
     - head of
     - people management
+
+# Penalize explicit language requirements unless the language is listed here.
+# Add languages you can use professionally, such as spanish or korean.
+# Add languages under boost when you want those requirements prioritized.
+language_requirements:
+  accepted:
+    - english
+  boost: []
+  penalty: 8
+  boost_points: 6
 
 locations:
   remote: true
@@ -155,6 +170,7 @@ sources:
       - canonical
       - coreweave
       - samsara
+      - nebius
     timeout_seconds: 20
   # Public Lever Postings API source. Use company names from URLs like:
   # https://jobs.lever.co/{company}

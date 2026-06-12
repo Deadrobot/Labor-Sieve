@@ -127,6 +127,7 @@ Edit these fields in `config.yaml`:
 - `role_family_weights`: higher values increase priority for a role family.
 - `keywords.boost`: terms that improve a match.
 - `keywords.penalize`: terms that lower a match.
+- `language_requirements`: languages that should be accepted or boosted when a posting lists language requirements.
 - `locations`: remote support, local-region notes, and accepted hybrid/on-site locations.
 - `compensation.minimum_base`: base-pay floor, or `null` to disable it.
 - `exclusions`: companies, URLs, or source IDs to omit from future reports.
@@ -168,6 +169,23 @@ locations:
 Hybrid and on-site roles outside `accepted_locations` are capped below P1. Remote roles are accepted when their location is generic remote or matches `accepted_remote_locations`; remote roles restricted to other geographies are also capped below P1. If a posting is marked both remote and hybrid, LaborSieve treats it as hybrid so local-region rules apply.
 
 Network-specific titles are assigned to the `networking` role family. The default weight is intentionally low; raise `role_family_weights.networking` if those roles should rank higher.
+
+### Language Requirements
+
+The default config accepts English and penalizes explicit bilingual or non-English language requirements. Add languages under `accepted` when those requirements should not lower a posting. Add languages under `boost` when those requirements should improve a posting.
+
+```yaml
+language_requirements:
+  accepted:
+    - english
+    # - spanish
+    # - korean
+  boost:
+    # - bilingual
+    # - spanish
+  penalty: 8
+  boost_points: 6
+```
 
 ### Exclusions
 
