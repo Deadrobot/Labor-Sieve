@@ -27,44 +27,52 @@ def score_jobs(jobs: list[Job], config: Config) -> list[ScoredJob]:
 
 
 def score_job(job: Job, config: Config) -> ScoredJob:
-    score = 20.0
-    reasons: list[str] = ["base score 20"]
+    score = 10.0
+    score_cap = 100.0
+    reasons: list[str] = ["base score 10"]
 
     role_weight = config.role_family_weights.get(
         job.role_family,
         config.role_family_weights.get("unknown", 0.0),
     )
-    score += role_weight * 40
+    score += role_weight * 35
     if job.role_family in config.role_family_weights:
         reasons.append(f"role family {job.role_family} weight {role_weight:.2f}")
     else:
         reasons.append(f"role family {job.role_family} not configured; used unknown weight {role_weight:.2f}")
 
     score += _seniority_points(job, config, reasons)
-    score += _location_points(job, config, reasons)
+    location_points, location_cap = _location_points_and_cap(job, config, reasons)
+    score += location_points
+    score_cap = min(score_cap, location_cap)
     score += _compensation_points(job, config, reasons)
 
     searchable_text = _job_text(job)
     boost_matches = _matching_keywords(searchable_text, config.keywords.boost)
     if boost_matches:
-        boost_points = min(len(boost_matches) * 4, 20)
+        boost_points = min(len(boost_matches) * 3, 15)
         score += boost_points
         reasons.append(f"boost keywords +{boost_points}: {', '.join(boost_matches)}")
 
     penalty_matches = _matching_keywords(searchable_text, config.keywords.penalize)
     if penalty_matches:
-        penalty_points = len(penalty_matches) * 7
+        penalty_points = len(penalty_matches) * 10
         score -= penalty_points
         reasons.append(f"penalty keywords -{penalty_points}: {', '.join(penalty_matches)}")
 
+    title_cap = _title_scope_cap(job, role_weight, reasons)
+    score_cap = min(score_cap, title_cap)
     if job.seniority == "principal" and not config.seniority.allow_principal:
-        score = min(score, 64)
+        score_cap = min(score_cap, 64)
         reasons.append("principal roles are capped because allow_principal is false")
     if job.seniority == "executive" and not config.seniority.allow_executive:
-        score = min(score, 49)
+        score_cap = min(score_cap, 49)
         reasons.append("executive roles are capped because allow_executive is false")
 
-    final_score = max(0, min(100, round(score)))
+    if score > score_cap:
+        reasons.append(f"score capped at {round(score_cap)} by scope limits")
+
+    final_score = max(0, min(100, round(min(score, score_cap))))
     return ScoredJob(
         job=job,
         score=final_score,
@@ -83,27 +91,32 @@ def _seniority_points(job: Job, config: Config, reasons: list[str]) -> float:
     max_index = seniority_index(config.seniority.max)
 
     if min_index <= job_index <= max_index:
-        reasons.append(f"seniority {job.seniority} within {config.seniority.min}-{config.seniority.max}; +20")
-        return 20
+        reasons.append(f"seniority {job.seniority} within {config.seniority.min}-{config.seniority.max}; +15")
+        return 15
     if job_index < min_index:
         gap = min_index - job_index
-        points = max(0, 10 - (gap * 3))
+        points = max(0, 8 - (gap * 3))
         reasons.append(f"seniority {job.seniority} below target range; +{points}")
         return points
 
     gap = job_index - max_index
-    points = max(0, 12 - (gap * 4))
+    points = max(0, 8 - (gap * 4))
     reasons.append(f"seniority {job.seniority} above target range; +{points}")
     return points
 
 
-def _location_points(job: Job, config: Config, reasons: list[str]) -> float:
+def _location_points_and_cap(job: Job, config: Config, reasons: list[str]) -> tuple[float, float]:
     if job.remote:
         if config.locations.remote:
-            reasons.append("remote role accepted; +10")
-            return 10
-        reasons.append("remote role but remote is disabled; +0")
-        return 0
+            if _remote_location_allowed(job.location, config):
+                reasons.append(f"remote location {job.location} accepted; +10")
+                return 10, 100
+            reasons.append(
+                f"remote location {job.location} does not match accepted_remote_locations; capped below P1"
+            )
+            return 0, 64
+        reasons.append("remote role but remote is disabled; capped below P1")
+        return 0, 64
 
     local_region = (
         f"{config.locations.local_region.center} "
@@ -112,21 +125,49 @@ def _location_points(job: Job, config: Config, reasons: list[str]) -> float:
     if _location_matches(job.location, config.locations.accepted_locations):
         if job.hybrid:
             reasons.append(f"hybrid location {job.location} accepted for {local_region}; +8")
-            return 8
+            return 8, 100
         reasons.append(f"local on-site location {job.location} accepted for {local_region}; +6")
-        return 6
+        return 6, 100
 
     if job.hybrid:
-        reasons.append(f"hybrid location {job.location} is not in accepted_locations; +2")
-        return 2
+        reasons.append(f"hybrid location {job.location} is not in accepted_locations; capped below P1")
+        return 0, 64
 
-    reasons.append("on-site or unspecified location outside accepted_locations; +0")
-    return 0
+    reasons.append("on-site or unspecified location outside accepted_locations; capped below P1")
+    return 0, 64
 
 
 def _location_matches(job_location: str, accepted_locations: list[str]) -> bool:
-    normalized_job_location = job_location.casefold()
-    return any(location.casefold() in normalized_job_location for location in accepted_locations)
+    normalized_job_location = _normalized_location_text(job_location)
+    return any(
+        _location_contains(normalized_job_location, _normalized_location_text(location))
+        for location in accepted_locations
+    )
+
+
+def _remote_location_allowed(job_location: str, config: Config) -> bool:
+    if _is_generic_remote_location(job_location):
+        return True
+    return _location_matches(
+        job_location,
+        [*config.locations.accepted_remote_locations, *config.locations.accepted_locations],
+    )
+
+
+def _is_generic_remote_location(job_location: str) -> bool:
+    normalized = _normalized_location_text(job_location)
+    return normalized in {"remote", "remote only", "fully remote", "virtual"}
+
+
+def _location_contains(normalized_haystack: str, normalized_needle: str) -> bool:
+    if not normalized_needle:
+        return False
+    pattern = r"(?<![a-z0-9])" + re.escape(normalized_needle) + r"(?![a-z0-9])"
+    return re.search(pattern, normalized_haystack) is not None
+
+
+def _normalized_location_text(value: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9]+", " ", value.casefold())).strip()
 
 
 def _compensation_points(job: Job, config: Config, reasons: list[str]) -> float:
@@ -142,6 +183,30 @@ def _compensation_points(job: Job, config: Config, reasons: list[str]) -> float:
         return 5
     reasons.append(f"base compensation below minimum ${minimum:,}; -15")
     return -15
+
+
+def _title_scope_cap(job: Job, role_weight: float, reasons: list[str]) -> float:
+    title = job.title.casefold()
+    cap = 100.0
+    if job.role_family == "management" and role_weight <= 0.25:
+        cap = min(cap, 49)
+        reasons.append("management role family is low-weighted; capped below P3")
+    if job.role_family == "software_engineering" and role_weight <= 0.25:
+        cap = min(cap, 64)
+        reasons.append("software engineering role family is low-weighted; capped below P1")
+    if re.search(r"\b(manager|director|vp|vice president|head of|chief)\b", title):
+        cap = min(cap, 49)
+        reasons.append("management title term matched; capped below P3")
+    if re.search(r"\b(frontend|front-end|full[- ]stack|mobile|ios|android)\b", title):
+        cap = min(cap, 64)
+        reasons.append("product software title term matched; capped below P1")
+    if re.search(r"\bsoftware engineer\b", title) and not re.search(
+        r"\b(site reliability|sre)\b",
+        title,
+    ):
+        cap = min(cap, 64)
+        reasons.append("software engineer title matched; capped below P1")
+    return cap
 
 
 def _job_text(job: Job) -> str:

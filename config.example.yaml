@@ -34,6 +34,7 @@ keywords:
     - linux
     - production operations
     - incident response
+    - sre
     - reliability
     - automation
     - capacity planning
@@ -49,8 +50,10 @@ keywords:
     - frontend
     - full-stack
     - mobile app
+    - software engineer
     - leetcode
     - product engineering
+    - manager
     - director
     - vp
     - head of
@@ -84,6 +87,15 @@ locations:
     - Highland Springs, VA
     - Bon Air, VA
     - Tuckahoe, VA
+  # Remote jobs are accepted when the location is generic remote or matches
+  # one of these strings. Remote jobs restricted to other geographies are capped.
+  accepted_remote_locations:
+    - United States
+    - United States of America
+    - USA
+    - U.S.
+    - US
+    - North America
 
 compensation:
   minimum_base: 115000
@@ -94,6 +106,8 @@ output:
   csv: true
   json: true
   html: true
+  terminal_p0_limit: 10
+  terminal_p1_limit: 15
 
 sources:
   # Synthetic local sample data is disabled by default so normal runs use live sources.
@@ -133,7 +147,7 @@ sources:
       - Crusoe
       - Modal
       - openai
-    timeout_seconds: 20
+    timeout_seconds: 30
     base_url: https://api.ashbyhq.com/posting-api/job-board
   # Public Workday candidate experience source. Use career site URLs like:
   # https://example.wd5.myworkdayjobs.com/ExampleExternalCareerSite

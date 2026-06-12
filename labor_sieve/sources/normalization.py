@@ -64,7 +64,7 @@ def normalize_job_record(
     if seniority not in SENIORITY_LEVELS:
         seniority = infer_seniority(text_for_inference)
 
-    role_family = first_string(record, "role_family", "family") or infer_role_family(text_for_inference)
+    role_family = first_string(record, "role_family", "family") or infer_role_family(title, text_for_inference)
     if role_family not in ROLE_FAMILIES and not _is_snake_case(role_family):
         role_family = "unknown"
 
@@ -259,8 +259,30 @@ def infer_seniority(text: str) -> str:
     return "mid"
 
 
-def infer_role_family(text: str) -> str:
-    normalized = text.casefold()
+def infer_role_family(title: str, text: str = "") -> str:
+    normalized_title = title.casefold()
+    normalized = " ".join([title, text]).casefold()
+    if re.search(r"\bincident manager\b", normalized_title) and any(
+        term in normalized for term in ("linux", "on-call", "incident response", "sre", "site reliability")
+    ):
+        return "sre_infra_ops"
+    if re.search(r"\b(vp|vice president|chief|cxo|executive|director|head of|manager)\b", normalized_title):
+        return "management"
+    if re.search(
+        r"\b(frontend|front-end|backend|full[- ]stack|mobile|ios|android|software engineer)\b",
+        normalized_title,
+    ) and not re.search(r"\b(site reliability|sre)\b", normalized_title):
+        return "software_engineering"
+    if any(term in normalized_title for term in ("data center", "datacenter", "hardware", "rack", "diagnostic")):
+        return "data_center_ops"
+    if any(term in normalized_title for term in ("logistics", "process improvement", "workflow")):
+        return "logistics_process"
+    if any(term in normalized_title for term in ("implementation", "customer support", "support engineer")):
+        return "implementation_support"
+    if any(term in normalized_title for term in ("sre", "site reliability", "linux", "incident response")):
+        return "sre_infra_ops"
+    if any(term in normalized_title for term in ("platform", "terraform", "kubernetes", "infrastructure")):
+        return "platform_ops"
     if re.search(r"\b(vp|vice president|chief|cxo|executive|director|head of)\b", normalized):
         return "management"
     if any(term in normalized for term in ("data center", "datacenter", "hardware", "rack", "diagnostic")):

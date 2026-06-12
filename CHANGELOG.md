@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Tighten default scoring and caps for non-local hybrid/on-site roles, restricted remote locations, management titles, and software-engineering titles.
+- Limit terminal P0/P1 output while keeping full reports complete.
+- Make Ashby source runs more tolerant of individual organization timeouts.
+
 ## 0.1.6
 
 - Add explicit config reset and user-data removal commands.

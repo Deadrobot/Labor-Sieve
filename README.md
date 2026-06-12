@@ -129,6 +129,7 @@ Edit these fields in `config.yaml`:
 - `keywords.penalize`: terms that lower a match.
 - `locations`: remote support, local-region notes, and accepted hybrid/on-site locations.
 - `compensation.minimum_base`: base-pay floor, or `null` to disable it.
+- `output.terminal_p0_limit` and `output.terminal_p1_limit`: terminal summary limits.
 - `sources`: enabled job sources.
 
 Role families are config-driven. Built-in families are listed in `labor-sieve list-options`. `role_family_weights` also accepts custom snake_case keys, and the scorer applies those weights to matching `role_family` values from sources and presets.
@@ -155,9 +156,15 @@ locations:
     - Richmond, VA
     - Henrico, VA
     - Glen Allen, VA
+  accepted_remote_locations:
+    - United States
+    - USA
+    - North America
 ```
 
 `local_region.center` and `radius_miles` describe the intended search area. LaborSieve does not geocode locations; it matches job-posting location text against `accepted_locations`. To use another city, change the center/radius note and replace `accepted_locations` with nearby city, county, or metro strings that should count as local.
+
+Hybrid and on-site roles outside `accepted_locations` are capped below P1. Remote roles are accepted when their location is generic remote or matches `accepted_remote_locations`; remote roles restricted to other geographies are also capped below P1.
 
 Download remote presets from a hosted preset index:
 
@@ -223,7 +230,7 @@ sources:
   ashby:
     enabled: false
     organizations: []
-    timeout_seconds: 20
+    timeout_seconds: 30
     base_url: https://api.ashbyhq.com/posting-api/job-board
   workday:
     enabled: false

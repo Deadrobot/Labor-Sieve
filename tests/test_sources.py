@@ -313,6 +313,42 @@ def test_ashby_source_tries_slug_variants(monkeypatch):
     ]
 
 
+def test_ashby_source_keeps_successful_jobs_when_one_organization_times_out(monkeypatch):
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+        def read(self, size=-1):
+            return json.dumps({"jobs": [{"id": "abc", "title": "Linux SRE", "jobUrl": "https://example.invalid"}]}).encode(
+                "utf-8"
+            )
+
+    seen_urls = []
+
+    def fake_open(request, timeout):
+        seen_urls.append(request.full_url)
+        if "/slow?" in request.full_url:
+            raise TimeoutError("timed out")
+        return FakeResponse()
+
+    monkeypatch.setattr("labor_sieve.sources.ashby.open_without_redirects", fake_open)
+
+    source = AshbySource(["slow", "example"])
+    jobs = source.fetch()
+
+    assert len(jobs) == 1
+    assert jobs[0].source_id == "abc"
+    assert len(source.warnings) == 1
+    assert "slow" in source.warnings[0]
+    assert seen_urls == [
+        "https://api.ashbyhq.com/posting-api/job-board/slow?includeCompensation=true",
+        "https://api.ashbyhq.com/posting-api/job-board/example?includeCompensation=true",
+    ]
+
+
 def test_workday_source_fetches_postings_and_details(monkeypatch):
     class FakeResponse:
         def __init__(self, payload):

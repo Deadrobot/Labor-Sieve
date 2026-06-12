@@ -35,6 +35,10 @@ def test_example_config_is_valid():
     assert config.locations.local_region.radius_miles == 40
     assert "Richmond, VA" in config.locations.accepted_locations
     assert "Petersburg, VA" in config.locations.accepted_locations
+    assert "United States" in config.locations.accepted_remote_locations
+    assert config.output.terminal_p0_limit == 10
+    assert config.output.terminal_p1_limit == 15
+    assert config.sources.ashby.timeout_seconds == 30
 
 
 def test_validation_reports_seniority_order_error():
@@ -179,6 +183,9 @@ def test_upgrade_config_adds_missing_defaults_without_changing_existing_values(t
     data["sources"].pop("ashby")
     data["sources"].pop("workday")
     data["locations"].pop("local_region")
+    data["locations"].pop("accepted_remote_locations")
+    data["output"].pop("terminal_p0_limit")
+    data["output"].pop("terminal_p1_limit")
     data["locations"]["accepted_locations"] = ["Custom, VA"]
     config_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
 
@@ -188,6 +195,9 @@ def test_upgrade_config_adds_missing_defaults_without_changing_existing_values(t
     assert result.changed is True
     assert result.added_paths == [
         "locations.local_region",
+        "locations.accepted_remote_locations",
+        "output.terminal_p0_limit",
+        "output.terminal_p1_limit",
         "sources.ashby",
         "sources.workday",
     ]
@@ -197,6 +207,8 @@ def test_upgrade_config_adds_missing_defaults_without_changing_existing_values(t
     assert upgraded["sources"]["greenhouse"]["board_tokens"] == ["custom-board"]
     assert upgraded["locations"]["accepted_locations"] == ["Custom, VA"]
     assert upgraded["locations"]["local_region"]["center"] == "Richmond, VA"
+    assert "United States" in upgraded["locations"]["accepted_remote_locations"]
+    assert upgraded["output"]["terminal_p0_limit"] == 10
     assert upgraded["sources"]["ashby"]["enabled"] is True
     assert upgraded["sources"]["workday"]["enabled"] is True
     assert "# Public Workday candidate experience source." in config_path.read_text(encoding="utf-8")

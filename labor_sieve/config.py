@@ -55,6 +55,7 @@ keywords:
     - linux
     - production operations
     - incident response
+    - sre
     - reliability
     - automation
     - capacity planning
@@ -70,8 +71,10 @@ keywords:
     - frontend
     - full-stack
     - mobile app
+    - software engineer
     - leetcode
     - product engineering
+    - manager
     - director
     - vp
     - head of
@@ -103,6 +106,15 @@ locations:
     - Highland Springs, VA
     - Bon Air, VA
     - Tuckahoe, VA
+  # Remote jobs are accepted when the location is generic remote or matches
+  # one of these strings. Remote jobs restricted to other geographies are capped.
+  accepted_remote_locations:
+    - United States
+    - United States of America
+    - USA
+    - U.S.
+    - US
+    - North America
 
 compensation:
   minimum_base: 115000
@@ -113,6 +125,8 @@ output:
   csv: true
   json: true
   html: true
+  terminal_p0_limit: 10
+  terminal_p1_limit: 15
 
 sources:
   sample:
@@ -141,7 +155,7 @@ sources:
       - Crusoe
       - Modal
       - openai
-    timeout_seconds: 20
+    timeout_seconds: 30
     base_url: https://api.ashbyhq.com/posting-api/job-board
   workday:
     enabled: true
@@ -191,6 +205,7 @@ class LocationConfig:
     remote: bool
     local_region: LocalRegionConfig
     accepted_locations: list[str]
+    accepted_remote_locations: list[str]
 
 
 @dataclass(slots=True)
@@ -205,6 +220,8 @@ class OutputConfig:
     csv: bool
     json: bool
     html: bool
+    terminal_p0_limit: int
+    terminal_p1_limit: int
 
 
 @dataclass(slots=True)
@@ -631,6 +648,13 @@ def validate_config_data(data: dict[str, Any]) -> list[str]:
             )
         if "accepted_locations" not in locations and "hybrid_locations" not in locations:
             errors.append("locations.accepted_locations must be a list of strings.")
+        if "accepted_remote_locations" in locations:
+            _require_string_list(
+                locations,
+                "accepted_remote_locations",
+                "locations.accepted_remote_locations",
+                errors,
+            )
 
     compensation = _require_mapping(data, "compensation", errors)
     if compensation is not None:
@@ -647,6 +671,12 @@ def validate_config_data(data: dict[str, Any]) -> list[str]:
             errors.append("output.directory must be a path string.")
         for key in ("txt", "csv", "json", "html"):
             _require_bool(output, key, f"output.{key}", errors)
+        for key in ("terminal_p0_limit", "terminal_p1_limit"):
+            value = output.get(key)
+            if value is not None and (
+                not isinstance(value, int) or isinstance(value, bool) or value < 0
+            ):
+                errors.append(f"output.{key} must be a non-negative integer.")
 
     sources = _require_mapping(data, "sources", errors)
     if sources is not None:
@@ -748,6 +778,7 @@ def config_from_data(data: dict[str, Any]) -> Config:
                 radius_miles=int(locations.get("local_region", {}).get("radius_miles", 40)),
             ),
             accepted_locations=_location_strings(locations),
+            accepted_remote_locations=_remote_location_strings(locations),
         ),
         compensation=CompensationConfig(
             minimum_base=(
@@ -762,6 +793,8 @@ def config_from_data(data: dict[str, Any]) -> Config:
             csv=bool(output["csv"]),
             json=bool(output["json"]),
             html=bool(output["html"]),
+            terminal_p0_limit=int(output.get("terminal_p0_limit", 10)),
+            terminal_p1_limit=int(output.get("terminal_p1_limit", 15)),
         ),
         sources=SourceConfig(
             sample=SampleSourceConfig(enabled=bool(sample["enabled"])),
@@ -820,6 +853,13 @@ def _location_strings(locations: dict[str, Any]) -> list[str]:
         if isinstance(raw_values, list):
             values.extend(str(value) for value in raw_values)
     return _dedupe_strings(values)
+
+
+def _remote_location_strings(locations: dict[str, Any]) -> list[str]:
+    raw_values = locations.get("accepted_remote_locations", [])
+    if isinstance(raw_values, list):
+        return _dedupe_strings([str(value) for value in raw_values])
+    return []
 
 
 def _dedupe_strings(values: list[str]) -> list[str]:

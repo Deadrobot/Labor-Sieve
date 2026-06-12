@@ -352,7 +352,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     except OSError as exc:
         print_errors([f"Reports could not be written: {exc}"])
         return 1
-    print(render_terminal_summary(scored, written, duplicate_count=duplicate_count))
+    print(render_terminal_summary(scored, written, config=config, duplicate_count=duplicate_count))
     return 0
 
 
@@ -423,6 +423,8 @@ def fetch_jobs(config: Config) -> tuple[list[Job], list[str]]:
     for source in enabled_sources(config):
         try:
             jobs.extend(fetch_source_with_status(source))
+            for warning in getattr(source, "warnings", []):
+                errors.append(f"{source.name}: {warning}")
         except SourceError as exc:
             errors.append(f"{source.name}: {exc}")
     return jobs, errors
@@ -635,8 +637,10 @@ def quickstart_text(config_path: Path, *, include_create: bool) -> str:
             "  Public remote sources are enabled by default; sample data is disabled.",
             "  Missing default settings are added automatically with a .bak backup.",
             "  Local-region settings are under locations.local_region and locations.accepted_locations.",
+            "  Remote-region settings are under locations.accepted_remote_locations.",
             "  Seniority settings are under seniority; remote/local preferences are under locations.",
             "  Compensation floor is under compensation.minimum_base.",
+            "  Terminal summary limits are under output.terminal_p0_limit and output.terminal_p1_limit.",
             "  Workday company examples are listed under sources.workday.sites.",
             "  Review or edit the enabled Greenhouse, Lever, Ashby, and Workday source lists.",
             "  Disable any source by setting that source's enabled field to false.",

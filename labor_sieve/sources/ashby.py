@@ -32,11 +32,20 @@ class AshbySource(JobSource):
         self.organizations = organizations
         self.timeout_seconds = timeout_seconds
         self.base_url = base_url.rstrip("/")
+        self.warnings: list[str] = []
 
     def fetch(self) -> list[Job]:
         jobs: list[Job] = []
+        errors = []
+        self.warnings = []
         for organization in self.organizations:
-            jobs.extend(self._fetch_organization(organization))
+            try:
+                jobs.extend(self._fetch_organization(organization))
+            except SourceError as exc:
+                errors.append(f"{organization}: {exc}")
+        if errors and not jobs:
+            raise SourceError("; ".join(errors[:3]))
+        self.warnings.extend(errors)
         return jobs
 
     def _fetch_organization(self, organization: str) -> list[Job]:
@@ -49,7 +58,10 @@ class AshbySource(JobSource):
             try:
                 return self._fetch_slug(variant, company_default=slug)
             except SourceError as exc:
-                errors.append(str(exc))
+                message = str(exc)
+                errors.append(message)
+                if "timed out" in message or "could not be reached" in message:
+                    break
         raise SourceError("; ".join(errors[:3]))
 
     def _fetch_slug(self, slug: str, *, company_default: str) -> list[Job]:

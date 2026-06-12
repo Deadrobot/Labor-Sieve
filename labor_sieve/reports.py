@@ -48,6 +48,7 @@ def render_terminal_summary(
     scored_jobs: list[ScoredJob],
     written: dict[str, Path],
     duplicate_count: int = 0,
+    config: Config | None = None,
 ) -> str:
     counts = bucket_counts(scored_jobs)
     lines = [
@@ -57,7 +58,13 @@ def render_terminal_summary(
         "",
     ]
 
-    top_matches = [item for item in scored_jobs if item.priority in {"P0", "P1"}]
+    terminal_p0_limit = config.output.terminal_p0_limit if config is not None else 10
+    terminal_p1_limit = config.output.terminal_p1_limit if config is not None else 15
+    top_matches = limited_terminal_matches(
+        scored_jobs,
+        terminal_p0_limit=terminal_p0_limit,
+        terminal_p1_limit=terminal_p1_limit,
+    )
     if top_matches:
         lines.append("P0/P1 matches:")
         for item in top_matches:
@@ -71,6 +78,13 @@ def render_terminal_summary(
                     f"  {job.url}",
                 ]
             )
+        hidden_count = hidden_terminal_match_count(
+            scored_jobs,
+            terminal_p0_limit=terminal_p0_limit,
+            terminal_p1_limit=terminal_p1_limit,
+        )
+        if hidden_count:
+            lines.append(f"... {hidden_count} additional P0/P1 matches are in the full reports.")
     else:
         lines.append("No P0/P1 matches.")
 
@@ -79,6 +93,39 @@ def render_terminal_summary(
         for report_type, path in written.items():
             lines.append(f"  {report_type}: {path}")
     return "\n".join(lines)
+
+
+def limited_terminal_matches(
+    scored_jobs: list[ScoredJob],
+    *,
+    terminal_p0_limit: int,
+    terminal_p1_limit: int,
+) -> list[ScoredJob]:
+    matches = []
+    p0_count = 0
+    p1_count = 0
+    for item in scored_jobs:
+        if item.priority == "P0" and p0_count < terminal_p0_limit:
+            matches.append(item)
+            p0_count += 1
+        elif item.priority == "P1" and p1_count < terminal_p1_limit:
+            matches.append(item)
+            p1_count += 1
+    return matches
+
+
+def hidden_terminal_match_count(
+    scored_jobs: list[ScoredJob],
+    *,
+    terminal_p0_limit: int,
+    terminal_p1_limit: int,
+) -> int:
+    p0_total = sum(1 for item in scored_jobs if item.priority == "P0")
+    p1_total = sum(1 for item in scored_jobs if item.priority == "P1")
+    return max(0, p0_total - terminal_p0_limit) + max(
+        0,
+        p1_total - terminal_p1_limit,
+    )
 
 
 def render_text_report(scored_jobs: list[ScoredJob]) -> str:

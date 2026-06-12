@@ -67,6 +67,26 @@ def test_terminal_summary_only_lists_p0_p1_matches(tmp_path):
     assert "Senior Full-Stack Software Engineer" not in summary
 
 
+def test_terminal_summary_limits_p0_and_p1_output(tmp_path):
+    config = load_config(tmp_path)
+    config.output.terminal_p0_limit = 1
+    config.output.terminal_p1_limit = 1
+    scored = [
+        ScoredJob(job=summary_job("p0-a"), score=95, priority="P0", reasons=[]),
+        ScoredJob(job=summary_job("p0-b"), score=94, priority="P0", reasons=[]),
+        ScoredJob(job=summary_job("p1-a"), score=85, priority="P1", reasons=[]),
+        ScoredJob(job=summary_job("p1-b"), score=84, priority="P1", reasons=[]),
+    ]
+
+    summary = render_terminal_summary(scored, {}, config=config)
+
+    assert "p0-a at Example Co" in summary
+    assert "p0-b at Example Co" not in summary
+    assert "p1-a at Example Co" in summary
+    assert "p1-b at Example Co" not in summary
+    assert "... 2 additional P0/P1 matches are in the full reports." in summary
+
+
 def test_html_report_does_not_link_unsafe_urls(tmp_path):
     config = load_config(tmp_path)
     jobs = SampleSource().fetch()
@@ -113,3 +133,22 @@ def test_csv_report_neutralizes_formula_prefixed_cells(tmp_path):
     assert row["source_id"].startswith("'=")
     assert row["merged_sources"].startswith("'@")
     assert row["url"] == "https://example.invalid/job"
+
+
+def summary_job(title: str) -> Job:
+    return Job(
+        id=title,
+        title=title,
+        company="Example Co",
+        location="Remote - United States",
+        remote=True,
+        hybrid=False,
+        seniority="senior",
+        role_family="sre_infra_ops",
+        compensation_base_min=150000,
+        url=f"https://example.invalid/jobs/{title}",
+        description="",
+        tags=[],
+        source="test",
+        source_id=title,
+    )
