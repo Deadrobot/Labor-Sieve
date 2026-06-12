@@ -262,7 +262,7 @@ def _language_requirement_points(job: Job, config: Config, reasons: list[str]) -
         if language.strip()
     }
     allowed = accepted | boosted
-    detected = _language_requirement_matches(_job_text(job))
+    detected = _language_requirement_matches(_job_text(job), _language_requirement_terms(allowed))
     if not detected:
         return 0
 
@@ -308,9 +308,20 @@ def _should_penalize_language_requirement(
     return True
 
 
-def _language_requirement_matches(text: str) -> list[str]:
+def _language_requirement_terms(configured_terms: set[str]) -> list[str]:
+    terms = []
+    seen = set()
+    for term in (*LANGUAGE_REQUIREMENT_TERMS, *configured_terms):
+        normalized = _normalize_language_term(term)
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            terms.append(normalized)
+    return terms
+
+
+def _language_requirement_matches(text: str, terms: list[str]) -> list[str]:
     matches = []
-    for term in LANGUAGE_REQUIREMENT_TERMS:
+    for term in terms:
         if _has_language_requirement_context(text, term):
             matches.append(term)
     return matches

@@ -172,7 +172,7 @@ Network-specific titles are assigned to the `networking` role family. The defaul
 
 ### Language Requirements
 
-The default config accepts English and penalizes explicit bilingual or non-English language requirements. Add languages under `accepted` when those requirements should not lower a posting. Add languages under `boost` when those requirements should improve a posting.
+The default config accepts English and penalizes explicit bilingual or non-English language requirements. Add languages or language phrases under `accepted` when those requirements should not lower a posting. Add terms under `boost` when those requirements should improve a posting. The commented entries are examples, not a fixed supported-language list.
 
 ```yaml
 language_requirements:
@@ -180,6 +180,7 @@ language_requirements:
     - english
     # - spanish
     # - korean
+    # - american sign language
   boost:
     # - bilingual
     # - spanish

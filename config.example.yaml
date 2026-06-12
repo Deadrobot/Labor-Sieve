@@ -69,9 +69,9 @@ keywords:
     - head of
     - people management
 
-# Penalize explicit language requirements unless the language is listed here.
-# Add languages you can use professionally, such as spanish or korean.
-# Add languages under boost when you want those requirements prioritized.
+# Explicit language requirements are penalized unless listed under accepted.
+# Add any language or phrase under accepted or boost as needed.
+# Leave boost empty unless language requirements should raise a posting's score.
 language_requirements:
   accepted:
     - english

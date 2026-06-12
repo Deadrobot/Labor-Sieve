@@ -5,6 +5,7 @@
 ## 0.1.12
 
 - Add configurable language requirement penalties and boosts.
+- Treat configured language terms as detector terms instead of limiting matches to a fixed built-in list.
 - Add Nebius to the default Greenhouse starter list.
 - Include Greenhouse metadata values in normalized job tags.
 - Boost site reliability titles and default keyword coverage for operations reliability roles.

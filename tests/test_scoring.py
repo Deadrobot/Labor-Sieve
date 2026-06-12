@@ -287,6 +287,59 @@ def test_language_requirement_boosts_configured_language():
     assert not any("language requirement" in reason for reason in item.reasons)
 
 
+def test_language_requirement_accepts_custom_configured_language_term():
+    config = load_config()
+    config.language_requirements.accepted.append("tagalog")
+    item = score_job(
+        Job(
+            id="tagalog-accepted",
+            title="Operations Reliability Engineer",
+            company="Example Co",
+            location="Remote - US",
+            remote=True,
+            hybrid=False,
+            seniority="mid",
+            role_family="fleet_reliability",
+            compensation_base_min=None,
+            url="https://example.invalid/jobs/tagalog-accepted",
+            description="Tagalog fluency required. Fleet reliability, automation, and troubleshooting.",
+            tags=["fleet", "reliability"],
+            source="test",
+            source_id="tagalog-accepted",
+        ),
+        config,
+    )
+
+    assert not any("language requirement" in reason for reason in item.reasons)
+
+
+def test_language_requirement_boosts_custom_configured_language_phrase():
+    config = load_config()
+    config.language_requirements.boost.append("american sign language")
+    item = score_job(
+        Job(
+            id="asl-boosted",
+            title="Operations Reliability Engineer",
+            company="Example Co",
+            location="Remote - US",
+            remote=True,
+            hybrid=False,
+            seniority="mid",
+            role_family="fleet_reliability",
+            compensation_base_min=None,
+            url="https://example.invalid/jobs/asl-boosted",
+            description="American Sign Language proficiency preferred. Fleet reliability and troubleshooting.",
+            tags=["fleet", "reliability"],
+            source="test",
+            source_id="asl-boosted",
+        ),
+        config,
+    )
+
+    assert any("language preference +6: american sign language" in reason for reason in item.reasons)
+    assert not any("language requirement" in reason for reason in item.reasons)
+
+
 def test_remote_restricted_outside_accepted_remote_locations_is_capped_below_p1():
     config = load_config()
     item = score_job(
