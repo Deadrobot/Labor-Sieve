@@ -113,13 +113,13 @@ labor-sieve uninstall-data
 
 `labor-sieve use-preset PRESET` merges a preset into `config.yaml`, validates the result, and writes a `.bak` backup first.
 
-`labor-sieve run` adds missing default settings when needed, then uses enabled sources from the selected config file. The default config disables sample data and enables public remote sources with starter company lists.
+`labor-sieve run` adds missing default settings when needed, then uses enabled sources from the selected config file. The default config disables sample data, enables RemoteOK for broad discovery, and enables public ATS starter company lists.
 
 `labor-sieve uninstall-data` prints user data paths. `labor-sieve uninstall-data --yes` removes the default config/report directory, downloaded presets, and run logs before uninstalling the command.
 
 ## Configuration
 
-The default configuration prioritizes production operations, infrastructure, Linux/SRE, data center, logistics/process, and implementation-support roles around Richmond, VA. Public remote sources are enabled by default, so the first real run can take several minutes.
+The default configuration prioritizes production operations, infrastructure, Linux/SRE, data center, logistics/process, and implementation-support roles around Richmond, VA. Broad public and configured ATS sources are enabled by default, so the first real run can take several minutes.
 
 Edit these fields in `config.yaml`:
 
@@ -201,12 +201,14 @@ Available sources:
 
 - `sample`: synthetic jobs for scoring/report smoke tests
 - `local_file`: local `.csv`, `.json`, `.yaml`, or `.yml` exports
+- `remoteok`: broad public RemoteOK API listings across many companies
+- `arbeitnow`: broad public Arbeitnow API listings, disabled by default because it is noisier for a US-centered search
 - `greenhouse`: public Greenhouse Job Board API boards
 - `lever`: public Lever Postings API companies
 - `ashby`: public Ashby job board organizations
 - `workday`: public Workday candidate experience sites
 
-The default config disables sample data and enables starter lists for Greenhouse, Lever, Ashby, and Workday. `local_file` remains disabled until file paths are added.
+The default config disables sample data, enables RemoteOK, disables Arbeitnow, and enables starter lists for Greenhouse, Lever, Ashby, and Workday. `local_file` remains disabled until file paths are added.
 
 Example local file config:
 
@@ -218,6 +220,17 @@ sources:
     enabled: true
     paths:
       - jobs.csv
+  remoteok:
+    enabled: false
+    timeout_seconds: 20
+    max_jobs: 250
+    base_url: https://remoteok.com/api
+  arbeitnow:
+    enabled: false
+    timeout_seconds: 20
+    max_pages: 1
+    max_jobs: 100
+    base_url: https://www.arbeitnow.com/api/job-board-api
   greenhouse:
     enabled: false
     board_tokens: []
@@ -247,6 +260,8 @@ title, company, location, remote, hybrid, seniority, role_family,
 compensation_base_min, url, description, tags
 ```
 
+The focused examples below omit `remoteok` and `arbeitnow` for brevity. Leave, disable, or edit those sections independently.
+
 Example Greenhouse config:
 
 ```yaml
@@ -269,7 +284,7 @@ sources:
   ashby:
     enabled: false
     organizations: []
-    timeout_seconds: 20
+    timeout_seconds: 30
     base_url: https://api.ashbyhq.com/posting-api/job-board
   workday:
     enabled: false
@@ -301,7 +316,7 @@ sources:
   ashby:
     enabled: false
     organizations: []
-    timeout_seconds: 20
+    timeout_seconds: 30
     base_url: https://api.ashbyhq.com/posting-api/job-board
   workday:
     enabled: false
@@ -333,7 +348,7 @@ sources:
     enabled: true
     organizations:
       - example-organization
-    timeout_seconds: 20
+    timeout_seconds: 30
     base_url: https://api.ashbyhq.com/posting-api/job-board
   workday:
     enabled: false
@@ -364,7 +379,7 @@ sources:
   ashby:
     enabled: false
     organizations: []
-    timeout_seconds: 20
+    timeout_seconds: 30
     base_url: https://api.ashbyhq.com/posting-api/job-board
   workday:
     enabled: true
@@ -394,7 +409,7 @@ less ~/labor-sieve/output/latest.txt
 
 The config file for this setup is `~/labor-sieve/config.yaml`. Default reports are written under `~/labor-sieve/output/`.
 
-Review the enabled source lists before scheduled use. Workday entries are under `sources.workday.sites`; Greenhouse, Lever, and Ashby entries are under their matching source sections.
+Review the enabled source lists before scheduled use. Broad sources are under `sources.remoteok` and `sources.arbeitnow`. Workday entries are under `sources.workday.sites`; Greenhouse, Lever, and Ashby entries are under their matching source sections.
 
 Subsequent runs:
 

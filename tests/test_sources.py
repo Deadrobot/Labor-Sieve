@@ -7,11 +7,13 @@ import pytest
 
 from labor_sieve.net import RedirectBlockedError
 from labor_sieve.sources.ashby import AshbySource, normalize_ashby_record
+from labor_sieve.sources.arbeitnow import ArbeitnowSource
 from labor_sieve.sources.base import SourceError
 from labor_sieve.sources.greenhouse import GreenhouseSource
 from labor_sieve.sources.lever import LeverSource, normalize_lever_record
 from labor_sieve.sources.local_file import LocalFileSource
 from labor_sieve.sources.normalization import infer_role_family, normalize_job_record, parse_money
+from labor_sieve.sources.remoteok import RemoteOkSource
 from labor_sieve.sources.workday import WorkdaySite, WorkdaySource, normalize_workday_record, parse_workday_site
 
 
@@ -234,6 +236,146 @@ def test_lever_source_fetches_postings(monkeypatch):
     assert len(jobs) == 1
     assert jobs[0].source == "lever"
     assert jobs[0].source_id == "abc"
+
+
+def test_remoteok_source_fetches_postings(monkeypatch):
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+        def read(self, size=-1):
+            return json.dumps(
+                [
+                    {"legal": "metadata"},
+                    {
+                        "id": "remoteok-1",
+                        "position": "Senior Linux SRE",
+                        "company": "Distributed Compute",
+                        "location": "Remote - United States",
+                        "url": "https://remoteok.com/remote-jobs/remoteok-1",
+                        "description": "<p>Linux incident response.</p>",
+                        "tags": ["linux", "sre"],
+                        "salary_min": 140000,
+                    },
+                ]
+            ).encode("utf-8")
+
+    def fake_open(request, timeout):
+        assert request.full_url == "https://remoteok.com/api"
+        assert timeout == 7
+        return FakeResponse()
+
+    monkeypatch.setattr("labor_sieve.sources.remoteok.open_without_redirects", fake_open)
+
+    jobs = RemoteOkSource(timeout_seconds=7, max_jobs=10).fetch()
+
+    assert len(jobs) == 1
+    assert jobs[0].source == "remoteok"
+    assert jobs[0].source_id == "remoteok-1"
+    assert jobs[0].remote is True
+    assert jobs[0].compensation_base_min == 140000
+    assert jobs[0].tags == ["linux", "sre"]
+
+
+def test_arbeitnow_source_fetches_postings(monkeypatch):
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+        def read(self, size=-1):
+            return json.dumps(
+                {
+                    "data": [
+                        {
+                            "slug": "linux-sre-richmond",
+                            "company_name": "Regional Compute",
+                            "title": "Linux SRE",
+                            "description": "<p>Incident response and automation.</p>",
+                            "remote": True,
+                            "url": "https://www.arbeitnow.com/jobs/linux-sre-richmond",
+                            "tags": ["Remote", "System and Network Administration"],
+                            "job_types": ["Full Time"],
+                            "location": "Remote",
+                        }
+                    ]
+                }
+            ).encode("utf-8")
+
+    seen_urls = []
+
+    def fake_open(request, timeout):
+        seen_urls.append(request.full_url)
+        assert timeout == 7
+        return FakeResponse()
+
+    monkeypatch.setattr("labor_sieve.sources.arbeitnow.open_without_redirects", fake_open)
+
+    jobs = ArbeitnowSource(timeout_seconds=7, max_pages=1, max_jobs=10).fetch()
+
+    assert len(jobs) == 1
+    assert jobs[0].source == "arbeitnow"
+    assert jobs[0].source_id == "linux-sre-richmond"
+    assert jobs[0].remote is True
+    assert jobs[0].tags == ["Remote", "System and Network Administration", "Full Time"]
+    assert seen_urls == ["https://www.arbeitnow.com/api/job-board-api?page=1"]
+
+
+def test_arbeitnow_source_fetches_multiple_pages_until_limit(monkeypatch):
+    class FakeResponse:
+        def __init__(self, payload):
+            self.payload = payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+        def read(self, size=-1):
+            return json.dumps(self.payload).encode("utf-8")
+
+    def fake_open(request, timeout):
+        if request.full_url.endswith("page=1"):
+            return FakeResponse(
+                {
+                    "data": [
+                        {
+                            "slug": "job-1",
+                            "company_name": "Company One",
+                            "title": "Linux SRE",
+                            "remote": True,
+                            "url": "https://example.invalid/job-1",
+                            "location": "Remote",
+                        }
+                    ]
+                }
+            )
+        return FakeResponse(
+            {
+                "data": [
+                    {
+                        "slug": "job-2",
+                        "company_name": "Company Two",
+                        "title": "Data Center Technician",
+                        "remote": False,
+                        "url": "https://example.invalid/job-2",
+                        "location": "Richmond, VA",
+                    }
+                ]
+            }
+        )
+
+    monkeypatch.setattr("labor_sieve.sources.arbeitnow.open_without_redirects", fake_open)
+
+    jobs = ArbeitnowSource(max_pages=2, max_jobs=2).fetch()
+
+    assert [job.source_id for job in jobs] == ["job-1", "job-2"]
 
 
 def test_ashby_source_fetches_postings(monkeypatch):

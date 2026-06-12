@@ -22,6 +22,10 @@ def test_example_config_is_valid():
     assert config.seniority.min == "mid"
     assert config.sources.sample.enabled is False
     assert config.sources.local_file.enabled is False
+    assert config.sources.remoteok.enabled is True
+    assert config.sources.remoteok.max_jobs == 250
+    assert config.sources.arbeitnow.enabled is False
+    assert config.sources.arbeitnow.max_pages == 1
     assert config.sources.greenhouse.enabled is True
     assert config.sources.lever.enabled is True
     assert config.sources.ashby.enabled is True
@@ -65,6 +69,15 @@ def test_validation_accepts_configured_sources():
     data["sources"]["sample"]["enabled"] = False
     data["sources"]["local_file"]["enabled"] = True
     data["sources"]["local_file"]["paths"] = ["jobs.csv"]
+    data["sources"]["remoteok"]["enabled"] = True
+    data["sources"]["remoteok"]["timeout_seconds"] = 10
+    data["sources"]["remoteok"]["max_jobs"] = 50
+    data["sources"]["remoteok"]["base_url"] = "https://remoteok.com/api"
+    data["sources"]["arbeitnow"]["enabled"] = True
+    data["sources"]["arbeitnow"]["timeout_seconds"] = 10
+    data["sources"]["arbeitnow"]["max_pages"] = 2
+    data["sources"]["arbeitnow"]["max_jobs"] = 50
+    data["sources"]["arbeitnow"]["base_url"] = "https://www.arbeitnow.com/api/job-board-api"
     data["sources"]["greenhouse"]["enabled"] = True
     data["sources"]["greenhouse"]["board_tokens"] = ["example"]
     data["sources"]["greenhouse"]["timeout_seconds"] = 10
@@ -91,6 +104,8 @@ def test_validation_accepts_configured_sources():
     assert errors == []
     assert config.sources.sample.enabled is False
     assert config.sources.local_file.paths == ["jobs.csv"]
+    assert config.sources.remoteok.max_jobs == 50
+    assert config.sources.arbeitnow.max_pages == 2
     assert config.sources.greenhouse.board_tokens == ["example"]
     assert config.sources.lever.companies == ["example"]
     assert config.sources.ashby.organizations == ["example"]
@@ -180,6 +195,8 @@ def test_upgrade_config_adds_missing_defaults_without_changing_existing_values(t
     data = load_example()
     data["sources"]["sample"]["enabled"] = True
     data["sources"]["greenhouse"]["board_tokens"] = ["custom-board"]
+    data["sources"].pop("remoteok")
+    data["sources"].pop("arbeitnow")
     data["sources"].pop("ashby")
     data["sources"].pop("workday")
     data["locations"].pop("local_region")
@@ -198,6 +215,8 @@ def test_upgrade_config_adds_missing_defaults_without_changing_existing_values(t
         "locations.accepted_remote_locations",
         "output.terminal_p0_limit",
         "output.terminal_p1_limit",
+        "sources.remoteok",
+        "sources.arbeitnow",
         "sources.ashby",
         "sources.workday",
     ]
@@ -209,6 +228,8 @@ def test_upgrade_config_adds_missing_defaults_without_changing_existing_values(t
     assert upgraded["locations"]["local_region"]["center"] == "Richmond, VA"
     assert "United States" in upgraded["locations"]["accepted_remote_locations"]
     assert upgraded["output"]["terminal_p0_limit"] == 10
+    assert upgraded["sources"]["remoteok"]["enabled"] is True
+    assert upgraded["sources"]["arbeitnow"]["enabled"] is False
     assert upgraded["sources"]["ashby"]["enabled"] is True
     assert upgraded["sources"]["workday"]["enabled"] is True
     assert "# Public Workday candidate experience source." in config_path.read_text(encoding="utf-8")

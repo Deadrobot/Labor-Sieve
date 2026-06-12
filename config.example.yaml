@@ -120,6 +120,20 @@ sources:
   local_file:
     enabled: false
     paths: []
+  # Broad public source for remote roles across many companies.
+  remoteok:
+    enabled: true
+    timeout_seconds: 20
+    max_jobs: 250
+    base_url: https://remoteok.com/api
+  # Broad public source with international roles. Disabled by default because
+  # it is much noisier for a US-centered search.
+  arbeitnow:
+    enabled: false
+    timeout_seconds: 20
+    max_pages: 1
+    max_jobs: 100
+    base_url: https://www.arbeitnow.com/api/job-board-api
   # Public Greenhouse Job Board API source. Use board tokens from URLs like:
   # https://boards.greenhouse.io/{board_token}
   greenhouse:

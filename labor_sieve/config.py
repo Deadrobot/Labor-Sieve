@@ -134,6 +134,20 @@ sources:
   local_file:
     enabled: false
     paths: []
+  # Broad public source for remote roles across many companies.
+  remoteok:
+    enabled: true
+    timeout_seconds: 20
+    max_jobs: 250
+    base_url: https://remoteok.com/api
+  # Broad public source with international roles. Disabled by default because
+  # it is much noisier for a US-centered search.
+  arbeitnow:
+    enabled: false
+    timeout_seconds: 20
+    max_pages: 1
+    max_jobs: 100
+    base_url: https://www.arbeitnow.com/api/job-board-api
   greenhouse:
     enabled: true
     board_tokens:
@@ -236,6 +250,23 @@ class LocalFileSourceConfig:
 
 
 @dataclass(slots=True)
+class RemoteOkSourceConfig:
+    enabled: bool
+    timeout_seconds: int
+    max_jobs: int
+    base_url: str
+
+
+@dataclass(slots=True)
+class ArbeitnowSourceConfig:
+    enabled: bool
+    timeout_seconds: int
+    max_pages: int
+    max_jobs: int
+    base_url: str
+
+
+@dataclass(slots=True)
 class GreenhouseSourceConfig:
     enabled: bool
     board_tokens: list[str]
@@ -277,6 +308,8 @@ class WorkdaySourceConfig:
 class SourceConfig:
     sample: SampleSourceConfig
     local_file: LocalFileSourceConfig
+    remoteok: RemoteOkSourceConfig
+    arbeitnow: ArbeitnowSourceConfig
     greenhouse: GreenhouseSourceConfig
     lever: LeverSourceConfig
     ashby: AshbySourceConfig
@@ -687,6 +720,19 @@ def validate_config_data(data: dict[str, Any]) -> list[str]:
         if local_file is not None:
             _require_bool(local_file, "enabled", "sources.local_file.enabled", errors)
             _require_string_list(local_file, "paths", "sources.local_file.paths", errors)
+        remoteok = _optional_mapping(sources, "remoteok", errors, label="sources.remoteok")
+        if remoteok is not None:
+            _require_bool(remoteok, "enabled", "sources.remoteok.enabled", errors)
+            _require_positive_int(remoteok, "timeout_seconds", "sources.remoteok.timeout_seconds", errors)
+            _require_int_range(remoteok, "max_jobs", "sources.remoteok.max_jobs", 1, 5000, errors)
+            _require_https_url(remoteok, "base_url", "sources.remoteok.base_url", errors)
+        arbeitnow = _optional_mapping(sources, "arbeitnow", errors, label="sources.arbeitnow")
+        if arbeitnow is not None:
+            _require_bool(arbeitnow, "enabled", "sources.arbeitnow.enabled", errors)
+            _require_positive_int(arbeitnow, "timeout_seconds", "sources.arbeitnow.timeout_seconds", errors)
+            _require_int_range(arbeitnow, "max_pages", "sources.arbeitnow.max_pages", 1, 20, errors)
+            _require_int_range(arbeitnow, "max_jobs", "sources.arbeitnow.max_jobs", 1, 5000, errors)
+            _require_https_url(arbeitnow, "base_url", "sources.arbeitnow.base_url", errors)
         greenhouse = _optional_mapping(sources, "greenhouse", errors, label="sources.greenhouse")
         if greenhouse is not None:
             _require_bool(greenhouse, "enabled", "sources.greenhouse.enabled", errors)
@@ -696,52 +742,33 @@ def validate_config_data(data: dict[str, Any]) -> list[str]:
                 "sources.greenhouse.board_tokens",
                 errors,
             )
-            timeout = greenhouse.get("timeout_seconds")
-            if not isinstance(timeout, int) or isinstance(timeout, bool) or timeout <= 0:
-                errors.append("sources.greenhouse.timeout_seconds must be a positive integer.")
+            _require_positive_int(greenhouse, "timeout_seconds", "sources.greenhouse.timeout_seconds", errors)
         lever = _optional_mapping(sources, "lever", errors, label="sources.lever")
         if lever is not None:
             _require_bool(lever, "enabled", "sources.lever.enabled", errors)
             _require_string_list(lever, "companies", "sources.lever.companies", errors)
-            timeout = lever.get("timeout_seconds")
-            if not isinstance(timeout, int) or isinstance(timeout, bool) or timeout <= 0:
-                errors.append("sources.lever.timeout_seconds must be a positive integer.")
-            if not _is_string(lever.get("base_url")):
-                errors.append("sources.lever.base_url must be a URL string.")
-            elif not str(lever["base_url"]).startswith("https://"):
-                errors.append("sources.lever.base_url must start with https://.")
+            _require_positive_int(lever, "timeout_seconds", "sources.lever.timeout_seconds", errors)
+            _require_https_url(lever, "base_url", "sources.lever.base_url", errors)
         ashby = _optional_mapping(sources, "ashby", errors, label="sources.ashby")
         if ashby is not None:
             _require_bool(ashby, "enabled", "sources.ashby.enabled", errors)
             _require_string_list(ashby, "organizations", "sources.ashby.organizations", errors)
-            timeout = ashby.get("timeout_seconds")
-            if not isinstance(timeout, int) or isinstance(timeout, bool) or timeout <= 0:
-                errors.append("sources.ashby.timeout_seconds must be a positive integer.")
-            if not _is_string(ashby.get("base_url")):
-                errors.append("sources.ashby.base_url must be a URL string.")
-            elif not str(ashby["base_url"]).startswith("https://"):
-                errors.append("sources.ashby.base_url must start with https://.")
+            _require_positive_int(ashby, "timeout_seconds", "sources.ashby.timeout_seconds", errors)
+            _require_https_url(ashby, "base_url", "sources.ashby.base_url", errors)
         workday = _optional_mapping(sources, "workday", errors, label="sources.workday")
         if workday is not None:
             _require_bool(workday, "enabled", "sources.workday.enabled", errors)
             _require_workday_sites(workday, errors)
-            timeout = workday.get("timeout_seconds")
-            if not isinstance(timeout, int) or isinstance(timeout, bool) or timeout <= 0:
-                errors.append("sources.workday.timeout_seconds must be a positive integer.")
-            page_size = workday.get("page_size")
-            if (
-                not isinstance(page_size, int)
-                or isinstance(page_size, bool)
-                or not 1 <= page_size <= 100
-            ):
-                errors.append("sources.workday.page_size must be an integer from 1 to 100.")
-            max_jobs = workday.get("max_jobs_per_site")
-            if (
-                not isinstance(max_jobs, int)
-                or isinstance(max_jobs, bool)
-                or not 1 <= max_jobs <= 5000
-            ):
-                errors.append("sources.workday.max_jobs_per_site must be an integer from 1 to 5000.")
+            _require_positive_int(workday, "timeout_seconds", "sources.workday.timeout_seconds", errors)
+            _require_int_range(workday, "page_size", "sources.workday.page_size", 1, 100, errors)
+            _require_int_range(
+                workday,
+                "max_jobs_per_site",
+                "sources.workday.max_jobs_per_site",
+                1,
+                5000,
+                errors,
+            )
 
     return errors
 
@@ -755,6 +782,8 @@ def config_from_data(data: dict[str, Any]) -> Config:
     sources = data["sources"]
     sample = sources["sample"]
     local_file = sources.get("local_file", {})
+    remoteok = sources.get("remoteok", {})
+    arbeitnow = sources.get("arbeitnow", {})
     greenhouse = sources.get("greenhouse", {})
     lever = sources.get("lever", {})
     ashby = sources.get("ashby", {})
@@ -801,6 +830,19 @@ def config_from_data(data: dict[str, Any]) -> Config:
             local_file=LocalFileSourceConfig(
                 enabled=bool(local_file.get("enabled", False)),
                 paths=[str(value) for value in local_file.get("paths", [])],
+            ),
+            remoteok=RemoteOkSourceConfig(
+                enabled=bool(remoteok.get("enabled", False)),
+                timeout_seconds=int(remoteok.get("timeout_seconds", 20)),
+                max_jobs=int(remoteok.get("max_jobs", 250)),
+                base_url=str(remoteok.get("base_url", "https://remoteok.com/api")),
+            ),
+            arbeitnow=ArbeitnowSourceConfig(
+                enabled=bool(arbeitnow.get("enabled", False)),
+                timeout_seconds=int(arbeitnow.get("timeout_seconds", 20)),
+                max_pages=int(arbeitnow.get("max_pages", 1)),
+                max_jobs=int(arbeitnow.get("max_jobs", 100)),
+                base_url=str(arbeitnow.get("base_url", "https://www.arbeitnow.com/api/job-board-api")),
             ),
             greenhouse=GreenhouseSourceConfig(
                 enabled=bool(greenhouse.get("enabled", False)),
@@ -918,6 +960,32 @@ def _require_string_list(
     value = mapping.get(key)
     if not isinstance(value, list) or not all(_is_string(item) for item in value):
         errors.append(f"{label} must be a list of strings.")
+
+
+def _require_positive_int(mapping: dict[str, Any], key: str, label: str, errors: list[str]) -> None:
+    value = mapping.get(key)
+    if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+        errors.append(f"{label} must be a positive integer.")
+
+
+def _require_int_range(
+    mapping: dict[str, Any],
+    key: str,
+    label: str,
+    minimum: int,
+    maximum: int,
+    errors: list[str],
+) -> None:
+    value = mapping.get(key)
+    if not isinstance(value, int) or isinstance(value, bool) or not minimum <= value <= maximum:
+        errors.append(f"{label} must be an integer from {minimum} to {maximum}.")
+
+
+def _require_https_url(mapping: dict[str, Any], key: str, label: str, errors: list[str]) -> None:
+    if not _is_string(mapping.get(key)):
+        errors.append(f"{label} must be a URL string.")
+    elif not str(mapping[key]).startswith("https://"):
+        errors.append(f"{label} must start with https://.")
 
 
 def _require_workday_sites(mapping: dict[str, Any], errors: list[str]) -> None:

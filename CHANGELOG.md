@@ -2,9 +2,12 @@
 
 ## Unreleased
 
+## 0.1.7
+
 - Tighten default scoring and caps for non-local hybrid/on-site roles, restricted remote locations, management titles, and software-engineering titles.
 - Limit terminal P0/P1 output while keeping full reports complete.
 - Make Ashby source runs more tolerant of individual organization timeouts.
+- Add broad RemoteOK and Arbeitnow public job board sources, with RemoteOK enabled by default and Arbeitnow disabled by default.
 
 ## 0.1.6
 

@@ -35,12 +35,14 @@ def test_quickstart_prints_first_run_steps(tmp_path, monkeypatch, capsys):
     assert "Set location, seniority, remote/on-site, compensation, keywords, and sources." in output
     assert "Validate it: labor-sieve validate-config" in output
     assert "Run a scan: labor-sieve run" in output
-    assert "Public remote sources are enabled by default; sample data is disabled." in output
+    assert "Public remote and configured ATS sources are enabled by default; sample data is disabled." in output
     assert "locations.local_region" in output
     assert "locations.accepted_locations" in output
     assert "compensation.minimum_base" in output
     assert "sources.workday.sites" in output
-    assert "Review or edit the enabled Greenhouse, Lever, Ashby, and Workday source lists." in output
+    assert "sources.remoteok" in output
+    assert "sources.arbeitnow" in output
+    assert "Review or edit the enabled RemoteOK, Greenhouse, Lever, Ashby, and Workday source lists." in output
     assert "Disable any source by setting that source's enabled field to false." in output
     assert f"labor-sieve validate-config -c {expected_config}" not in output
     assert str(expected_report) in output

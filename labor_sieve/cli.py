@@ -37,10 +37,12 @@ from .presets import (
 from .reports import render_terminal_summary, write_reports
 from .scoring import score_jobs
 from .sources.ashby import AshbySource
+from .sources.arbeitnow import ArbeitnowSource
 from .sources.base import JobSource, SourceError
 from .sources.greenhouse import GreenhouseSource
 from .sources.local_file import LocalFileSource
 from .sources.lever import LeverSource
+from .sources.remoteok import RemoteOkSource
 from .sources.sample import SampleSource
 from .sources.workday import WorkdaySite, WorkdaySource
 
@@ -436,6 +438,23 @@ def enabled_sources(config: Config) -> list[JobSource]:
         sources.append(SampleSource())
     if config.sources.local_file.enabled:
         sources.append(LocalFileSource(config.sources.local_file.paths))
+    if config.sources.remoteok.enabled:
+        sources.append(
+            RemoteOkSource(
+                timeout_seconds=config.sources.remoteok.timeout_seconds,
+                max_jobs=config.sources.remoteok.max_jobs,
+                base_url=config.sources.remoteok.base_url,
+            )
+        )
+    if config.sources.arbeitnow.enabled:
+        sources.append(
+            ArbeitnowSource(
+                timeout_seconds=config.sources.arbeitnow.timeout_seconds,
+                max_pages=config.sources.arbeitnow.max_pages,
+                max_jobs=config.sources.arbeitnow.max_jobs,
+                base_url=config.sources.arbeitnow.base_url,
+            )
+        )
     if config.sources.greenhouse.enabled:
         sources.append(
             GreenhouseSource(
@@ -634,15 +653,16 @@ def quickstart_text(config_path: Path, *, include_create: bool) -> str:
             f"  5. Read the text report: {_quote(str(output_dir / 'latest.txt'))}",
             "",
             "Config notes:",
-            "  Public remote sources are enabled by default; sample data is disabled.",
+            "  Public remote and configured ATS sources are enabled by default; sample data is disabled.",
             "  Missing default settings are added automatically with a .bak backup.",
             "  Local-region settings are under locations.local_region and locations.accepted_locations.",
             "  Remote-region settings are under locations.accepted_remote_locations.",
             "  Seniority settings are under seniority; remote/local preferences are under locations.",
             "  Compensation floor is under compensation.minimum_base.",
             "  Terminal summary limits are under output.terminal_p0_limit and output.terminal_p1_limit.",
+            "  Broad source controls are under sources.remoteok and sources.arbeitnow.",
             "  Workday company examples are listed under sources.workday.sites.",
-            "  Review or edit the enabled Greenhouse, Lever, Ashby, and Workday source lists.",
+            "  Review or edit the enabled RemoteOK, Greenhouse, Lever, Ashby, and Workday source lists.",
             "  Disable any source by setting that source's enabled field to false.",
             "",
             "Useful setup commands:",
