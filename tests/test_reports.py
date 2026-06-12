@@ -8,6 +8,7 @@ from labor_sieve.models import Job, ScoredJob
 from labor_sieve.reports import (
     render_html_report,
     render_terminal_summary,
+    terminal_location,
     render_text_report,
     write_csv_report,
     write_reports,
@@ -85,6 +86,11 @@ def test_terminal_summary_limits_p0_and_p1_output(tmp_path):
     assert "p1-a at Example Co" in summary
     assert "p1-b at Example Co" not in summary
     assert "... 2 additional P0/P1 matches are in the full reports." in summary
+
+
+def test_terminal_location_keeps_specific_remote_region():
+    assert terminal_location("Remote - United States", True) == "Remote - United States"
+    assert terminal_location("Unknown", True) == "Remote"
 
 
 def test_html_report_does_not_link_unsafe_urls(tmp_path):

@@ -197,6 +197,15 @@ def _title_scope_cap(job: Job, role_weight: float, reasons: list[str]) -> float:
     if re.search(r"\b(manager|director|vp|vice president|head of|chief)\b", title):
         cap = min(cap, 49)
         reasons.append("management title term matched; capped below P3")
+    if re.search(r"\bsales engineer\b", title):
+        cap = min(cap, 64)
+        reasons.append("sales engineer title matched; capped below P1")
+    if re.search(
+        r"\b(applied scientist|data scientist|research scientist|machine learning scientist|ml scientist)\b",
+        title,
+    ):
+        cap = min(cap, 64)
+        reasons.append("scientist title matched; capped below P1")
     if re.search(r"\b(frontend|front-end|full[- ]stack|mobile|ios|android)\b", title):
         cap = min(cap, 64)
         reasons.append("product software title term matched; capped below P1")

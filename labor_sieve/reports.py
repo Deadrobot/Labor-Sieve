@@ -70,7 +70,7 @@ def render_terminal_summary(
         for item in top_matches:
             job = item.job
             comp = format_compensation(job.compensation_base_min)
-            location = "Remote" if job.remote else job.location
+            location = terminal_location(job.location, job.remote)
             lines.extend(
                 [
                     f"{item.priority} {item.score}: {job.title} at {job.company}",
@@ -126,6 +126,12 @@ def hidden_terminal_match_count(
         0,
         p1_total - terminal_p1_limit,
     )
+
+
+def terminal_location(location: str, remote: bool) -> str:
+    if location and location != "Unknown":
+        return location
+    return "Remote" if remote else location
 
 
 def render_text_report(scored_jobs: list[ScoredJob]) -> str:

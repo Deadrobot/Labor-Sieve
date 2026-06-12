@@ -148,6 +148,60 @@ def test_software_engineer_title_is_capped_below_p1():
     assert any("software engineer title matched" in reason for reason in item.reasons)
 
 
+def test_sales_engineer_title_is_capped_below_p1():
+    config = load_config()
+    item = score_job(
+        Job(
+            id="sales-engineer",
+            title="Sales Engineer I, SE Desk - Southeast",
+            company="Example Co",
+            location="Remote - United States",
+            remote=True,
+            hybrid=False,
+            seniority="mid",
+            role_family="data_center_ops",
+            compensation_base_min=180000,
+            url="https://example.invalid/jobs/sales-engineer",
+            description="Fleet hardware integrations, customer troubleshooting, and operations support.",
+            tags=["fleet", "hardware"],
+            source="test",
+            source_id="sales-engineer",
+        ),
+        config,
+    )
+
+    assert item.priority not in {"P0", "P1"}
+    assert item.score <= 64
+    assert any("sales engineer title matched" in reason for reason in item.reasons)
+
+
+def test_scientist_title_is_capped_below_p1():
+    config = load_config()
+    item = score_job(
+        Job(
+            id="applied-scientist",
+            title="Sr Staff / Staff Applied Scientist",
+            company="Example Co",
+            location="Remote - United States",
+            remote=True,
+            hybrid=False,
+            seniority="staff",
+            role_family="data_center_ops",
+            compensation_base_min=220000,
+            url="https://example.invalid/jobs/applied-scientist",
+            description="Fleet telemetry, capacity planning, reliability, and automation.",
+            tags=["fleet", "automation"],
+            source="test",
+            source_id="applied-scientist",
+        ),
+        config,
+    )
+
+    assert item.priority not in {"P0", "P1"}
+    assert item.score <= 64
+    assert any("scientist title matched" in reason for reason in item.reasons)
+
+
 def test_manager_title_is_rejected_by_default():
     config = load_config()
     item = score_job(

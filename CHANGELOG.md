@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.1.8
+
+- Increase Ashby response-size headroom for large public boards while keeping a bounded source cap.
+- Avoid repeated Ashby casing retries after oversized, timeout, or network failures.
+- Cap sales engineer and scientist titles below P1 by default.
+- Show the specific remote location string in terminal summaries when one is available.
+
 ## 0.1.7
 
 - Tighten default scoring and caps for non-local hybrid/on-site roles, restricted remote locations, management titles, and software-engineering titles.

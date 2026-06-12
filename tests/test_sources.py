@@ -5,8 +5,8 @@ from urllib.error import HTTPError
 
 import pytest
 
-from labor_sieve.net import RedirectBlockedError
-from labor_sieve.sources.ashby import AshbySource, normalize_ashby_record
+from labor_sieve.net import MAX_REMOTE_RESPONSE_BYTES, RedirectBlockedError, ResponseTooLargeError
+from labor_sieve.sources.ashby import MAX_ASHBY_RESPONSE_BYTES, AshbySource, normalize_ashby_record
 from labor_sieve.sources.arbeitnow import ArbeitnowSource
 from labor_sieve.sources.base import SourceError
 from labor_sieve.sources.greenhouse import GreenhouseSource
@@ -455,6 +455,51 @@ def test_ashby_source_tries_slug_variants(monkeypatch):
     ]
 
 
+def test_ashby_source_allows_openai_sized_payload(monkeypatch):
+    openai_payload_bytes = 12103473
+
+    class FakeResponse:
+        headers = {"Content-Length": str(openai_payload_bytes)}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+        def read(self, size=-1):
+            return json.dumps({"jobs": [{"id": "abc", "title": "Linux SRE", "jobUrl": "https://example.invalid"}]}).encode(
+                "utf-8"
+            )
+
+    def fake_open(request, timeout):
+        return FakeResponse()
+
+    monkeypatch.setattr("labor_sieve.sources.ashby.open_without_redirects", fake_open)
+
+    assert openai_payload_bytes > MAX_REMOTE_RESPONSE_BYTES
+    assert MAX_ASHBY_RESPONSE_BYTES > MAX_REMOTE_RESPONSE_BYTES
+    jobs = AshbySource(["openai"]).fetch()
+
+    assert len(jobs) == 1
+    assert jobs[0].source_id == "abc"
+
+
+def test_ashby_source_stops_slug_variants_after_oversized_response(monkeypatch):
+    seen_urls = []
+
+    def fake_open(request, timeout):
+        seen_urls.append(request.full_url)
+        raise ResponseTooLargeError("Ashby organization 'openai' response is larger than the byte limit.")
+
+    monkeypatch.setattr("labor_sieve.sources.ashby.open_without_redirects", fake_open)
+
+    with pytest.raises(SourceError):
+        AshbySource(["openai"]).fetch()
+
+    assert seen_urls == ["https://api.ashbyhq.com/posting-api/job-board/openai?includeCompensation=true"]
+
+
 def test_ashby_source_keeps_successful_jobs_when_one_organization_times_out(monkeypatch):
     class FakeResponse:
         def __enter__(self):
@@ -579,6 +624,11 @@ def test_role_family_inference_keeps_incident_manager_operational():
 
 def test_role_family_inference_keeps_executive_roles_management():
     assert infer_role_family("VP of Infrastructure Operations and people management") == "management"
+
+
+def test_role_family_inference_respects_out_of_scope_title_terms():
+    assert infer_role_family("Sales Engineer I", "fleet hardware customer operations") == "customer_operations"
+    assert infer_role_family("Sr Staff Applied Scientist", "fleet reliability capacity planning") == "software_engineering"
 
 
 def test_greenhouse_source_rejects_oversized_response(monkeypatch):

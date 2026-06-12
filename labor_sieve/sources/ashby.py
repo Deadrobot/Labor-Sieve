@@ -9,7 +9,6 @@ from urllib.request import Request
 
 from labor_sieve.net import (
     MAX_RECORDS_PER_SOURCE,
-    MAX_REMOTE_RESPONSE_BYTES,
     RedirectBlockedError,
     ResponseTooLargeError,
     open_without_redirects,
@@ -18,6 +17,9 @@ from labor_sieve.net import (
 from labor_sieve.models import Job
 from labor_sieve.sources.base import JobSource, SourceError
 from labor_sieve.sources.normalization import clean_text, normalize_job_record
+
+
+MAX_ASHBY_RESPONSE_BYTES = 16 * 1024 * 1024
 
 
 class AshbySource(JobSource):
@@ -60,7 +62,7 @@ class AshbySource(JobSource):
             except SourceError as exc:
                 message = str(exc)
                 errors.append(message)
-                if "timed out" in message or "could not be reached" in message:
+                if ashby_error_should_stop_slug_retries(message):
                     break
         raise SourceError("; ".join(errors[:3]))
 
@@ -73,7 +75,7 @@ class AshbySource(JobSource):
             with open_without_redirects(request, self.timeout_seconds) as response:
                 content = read_response_limited(
                     response,
-                    MAX_REMOTE_RESPONSE_BYTES,
+                    MAX_ASHBY_RESPONSE_BYTES,
                     f"Ashby organization {slug!r} response",
                 )
                 payload = json.loads(content.decode("utf-8"))
@@ -154,6 +156,18 @@ def ashby_slug_variants(slug: str) -> list[str]:
         lowered[:1].upper() + lowered[1:] if lowered else "",
     ]
     return dedupe_slug_variants(variants)
+
+
+def ashby_error_should_stop_slug_retries(message: str) -> bool:
+    normalized = message.casefold()
+    return any(
+        term in normalized
+        for term in (
+            "timed out",
+            "could not be reached",
+            "response is larger than",
+        )
+    )
 
 
 def ashby_job_id(record: dict[str, object]) -> object:

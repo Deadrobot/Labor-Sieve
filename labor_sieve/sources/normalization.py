@@ -273,6 +273,13 @@ def infer_role_family(title: str, text: str = "") -> str:
         normalized_title,
     ) and not re.search(r"\b(site reliability|sre)\b", normalized_title):
         return "software_engineering"
+    if re.search(r"\bsales engineer\b", normalized_title):
+        return "customer_operations"
+    if re.search(
+        r"\b(applied scientist|data scientist|research scientist|machine learning scientist|ml scientist)\b",
+        normalized_title,
+    ):
+        return "software_engineering"
     if any(term in normalized_title for term in ("data center", "datacenter", "hardware", "rack", "diagnostic")):
         return "data_center_ops"
     if any(term in normalized_title for term in ("logistics", "process improvement", "workflow")):
