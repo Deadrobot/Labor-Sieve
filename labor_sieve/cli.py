@@ -4,20 +4,24 @@ from __future__ import annotations
 
 import argparse
 import shlex
+import shutil
 import sys
 import threading
 import time
 from pathlib import Path
+from typing import TextIO
 
 from . import __version__
 from .config import (
     Config,
     ConfigError,
+    ConfigUpgradeResult,
     built_in_options_text,
     find_config_example,
     init_config,
     load_config,
     read_yaml_file,
+    upgrade_config,
     validate_config_data,
     yaml,
 )
@@ -64,12 +68,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     init_parser = subparsers.add_parser("init", parents=[config_parent], help="Create config.yaml")
+    init_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Back up and replace an existing config.yaml with packaged defaults",
+    )
     init_parser.set_defaults(func=cmd_init)
 
     quickstart_parser = subparsers.add_parser(
         "quickstart",
         parents=[config_parent],
         help="Create default config if missing and print setup instructions",
+    )
+    quickstart_parser.add_argument(
+        "--reset-config",
+        action="store_true",
+        help="Back up and replace an existing config.yaml with packaged defaults",
     )
     quickstart_parser.set_defaults(func=cmd_quickstart)
 
@@ -87,8 +101,26 @@ def build_parser() -> argparse.ArgumentParser:
     )
     validate_parser.set_defaults(func=cmd_validate_config)
 
+    config_upgrade_parser = subparsers.add_parser(
+        "config-upgrade",
+        parents=[config_parent],
+        help="Back up config.yaml and add missing default settings",
+    )
+    config_upgrade_parser.set_defaults(func=cmd_config_upgrade)
+
     run_parser = subparsers.add_parser("run", parents=[config_parent], help="Run enabled sources and write reports")
     run_parser.set_defaults(func=cmd_run)
+
+    uninstall_data_parser = subparsers.add_parser(
+        "uninstall-data",
+        help="Remove LaborSieve user config, reports, presets, and run state",
+    )
+    uninstall_data_parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="Actually remove user data; without this flag, only print the paths",
+    )
+    uninstall_data_parser.set_defaults(func=cmd_uninstall_data)
 
     list_parser = subparsers.add_parser("list-options", help="List supported taxonomy options")
     list_parser.set_defaults(func=cmd_list_options)
@@ -140,7 +172,7 @@ def build_parser() -> argparse.ArgumentParser:
 def cmd_init(args: argparse.Namespace) -> int:
     config_path = resolve_config_path(args.config)
     try:
-        print(init_config(config_path))
+        print(init_config(config_path, overwrite=args.force))
     except ConfigError as exc:
         print_errors(exc.errors)
         return 1
@@ -151,15 +183,17 @@ def cmd_init(args: argparse.Namespace) -> int:
 
 def cmd_quickstart(args: argparse.Namespace) -> int:
     config_path = _absolute_path(resolve_config_path(args.config))
-    if not config_path.exists():
+    if args.reset_config or not config_path.exists():
         try:
-            print(init_config(config_path))
+            print(init_config(config_path, overwrite=args.reset_config))
         except ConfigError as exc:
             print_errors(exc.errors)
             return 1
         print()
         print(quickstart_text(config_path, include_create=False))
     else:
+        if not upgrade_config_if_needed(config_path, stream=sys.stdout):
+            return 1
         print(quickstart_text(config_path, include_create=True))
     return 0
 
@@ -231,6 +265,8 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
 def cmd_validate_config(args: argparse.Namespace) -> int:
     path = resolve_config_path(args.config)
+    if not upgrade_config_if_needed(path, stream=sys.stdout):
+        return 1
     try:
         data = read_yaml_file(path)
     except ConfigError as exc:
@@ -246,6 +282,45 @@ def cmd_validate_config(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_config_upgrade(args: argparse.Namespace) -> int:
+    path = resolve_config_path(args.config)
+    try:
+        result = upgrade_config(path)
+    except ConfigError as exc:
+        print_errors(exc.errors)
+        return 1
+    print(format_config_upgrade_result(result))
+    return 0
+
+
+def cmd_uninstall_data(args: argparse.Namespace) -> int:
+    paths = user_data_paths()
+    if not args.yes:
+        print("LaborSieve user data paths:")
+        for path in paths:
+            status = "exists" if path.exists() else "not found"
+            print(f"  {path} ({status})")
+        print()
+        print("To remove these files, run: labor-sieve uninstall-data --yes")
+        print("Then remove the installed command with: pipx uninstall labor-sieve")
+        return 0
+
+    for path in paths:
+        try:
+            if path.is_dir():
+                shutil.rmtree(path)
+                print(f"Removed {path}")
+            elif path.exists():
+                path.unlink()
+                print(f"Removed {path}")
+            else:
+                print(f"Not found: {path}")
+        except OSError as exc:
+            print_errors([f"{path} could not be removed: {exc}"])
+            return 1
+    return 0
+
+
 def cmd_list_options(args: argparse.Namespace) -> int:
     del args
     print(built_in_options_text())
@@ -254,6 +329,8 @@ def cmd_list_options(args: argparse.Namespace) -> int:
 
 def cmd_run(args: argparse.Namespace) -> int:
     config_path = resolve_config_path(args.config)
+    if not upgrade_config_if_needed(config_path, stream=sys.stderr):
+        return 1
     try:
         config = load_config(config_path)
     except ConfigError as exc:
@@ -438,6 +515,29 @@ def format_elapsed(start: float) -> str:
     return f"{seconds}s"
 
 
+def upgrade_config_if_needed(path: Path, *, stream: TextIO) -> bool:
+    try:
+        result = upgrade_config(path)
+    except ConfigError as exc:
+        print_errors(exc.errors)
+        return False
+    if result.changed:
+        print(format_config_upgrade_result(result), file=stream)
+    return True
+
+
+def format_config_upgrade_result(result: ConfigUpgradeResult) -> str:
+    if not result.changed:
+        return f"Config is current: {result.path}"
+    lines = [
+        f"Config updated: {result.path}",
+        f"Backup written to {result.backup_path}",
+        "Added missing settings:",
+    ]
+    lines.extend(f"  - {path}" for path in result.added_paths)
+    return "\n".join(lines)
+
+
 def print_errors(errors: list[str]) -> None:
     print("Errors:", file=sys.stderr)
     for error in errors:
@@ -446,6 +546,14 @@ def print_errors(errors: list[str]) -> None:
 
 def default_config_path() -> Path:
     return Path.home() / "labor-sieve" / "config.yaml"
+
+
+def user_data_paths() -> list[Path]:
+    return [
+        Path.home() / "labor-sieve",
+        Path.home() / ".config" / "labor-sieve",
+        Path.home() / ".local" / "state" / "labor-sieve",
+    ]
 
 
 def resolve_config_path(value: str | None) -> Path:
@@ -504,6 +612,16 @@ def quickstart_text(config_path: Path, *, include_create: bool) -> str:
                 "",
             ]
         )
+    elif include_create and config_path.exists():
+        reset_command = f"labor-sieve quickstart --reset-config -c {_quote(config_path)}"
+        lines.extend(
+            [
+                "Existing config:",
+                "  quickstart keeps existing values and adds missing default settings when needed.",
+                f"  Replace all settings with packaged defaults: {reset_command}",
+                "",
+            ]
+        )
     lines.extend(
         [
             "Next steps:",
@@ -515,6 +633,7 @@ def quickstart_text(config_path: Path, *, include_create: bool) -> str:
             "",
             "Config notes:",
             "  Public remote sources are enabled by default; sample data is disabled.",
+            "  Missing default settings are added automatically with a .bak backup.",
             "  Local-region settings are under locations.local_region and locations.accepted_locations.",
             "  Seniority settings are under seniority; remote/local preferences are under locations.",
             "  Compensation floor is under compensation.minimum_base.",

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import yaml
 
-from labor_sieve.config import config_from_data, init_config, validate_config_data
+from labor_sieve.config import config_from_data, init_config, upgrade_config, validate_config_data
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -157,6 +157,61 @@ def test_init_config_does_not_overwrite_existing_file(tmp_path):
     assert "already exists" in message
     assert str(config_path) in message
     assert config_path.read_text(encoding="utf-8") == "existing: true\n"
+
+
+def test_init_config_force_backs_up_and_replaces_existing_file(tmp_path):
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("existing: true\n", encoding="utf-8")
+
+    message = init_config(config_path, overwrite=True)
+
+    assert "Replaced" in message
+    assert "Backup written to" in message
+    assert (tmp_path / "config.yaml.bak").read_text(encoding="utf-8") == "existing: true\n"
+    assert config_path.read_text(encoding="utf-8").startswith("# LaborSieve configuration.")
+
+
+def test_upgrade_config_adds_missing_defaults_without_changing_existing_values(tmp_path):
+    config_path = tmp_path / "config.yaml"
+    data = load_example()
+    data["sources"]["sample"]["enabled"] = True
+    data["sources"]["greenhouse"]["board_tokens"] = ["custom-board"]
+    data["sources"].pop("ashby")
+    data["sources"].pop("workday")
+    data["locations"].pop("local_region")
+    data["locations"]["accepted_locations"] = ["Custom, VA"]
+    config_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+
+    result = upgrade_config(config_path)
+
+    upgraded = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    assert result.changed is True
+    assert result.added_paths == [
+        "locations.local_region",
+        "sources.ashby",
+        "sources.workday",
+    ]
+    assert result.backup_path == tmp_path / "config.yaml.bak"
+    assert (tmp_path / "config.yaml.bak").exists()
+    assert upgraded["sources"]["sample"]["enabled"] is True
+    assert upgraded["sources"]["greenhouse"]["board_tokens"] == ["custom-board"]
+    assert upgraded["locations"]["accepted_locations"] == ["Custom, VA"]
+    assert upgraded["locations"]["local_region"]["center"] == "Richmond, VA"
+    assert upgraded["sources"]["ashby"]["enabled"] is True
+    assert upgraded["sources"]["workday"]["enabled"] is True
+    assert "# Public Workday candidate experience source." in config_path.read_text(encoding="utf-8")
+
+
+def test_upgrade_config_is_noop_when_config_is_current(tmp_path):
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text((ROOT / "config.example.yaml").read_text(encoding="utf-8"), encoding="utf-8")
+
+    result = upgrade_config(config_path)
+
+    assert result.changed is False
+    assert result.backup_path is None
+    assert result.added_paths == []
+    assert not (tmp_path / "config.yaml.bak").exists()
 
 
 def test_init_config_uses_packaged_example_not_current_directory(tmp_path, monkeypatch):

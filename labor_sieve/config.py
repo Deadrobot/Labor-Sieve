@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import shutil
 import sys
+from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -276,26 +277,247 @@ class Config:
     sources: SourceConfig
 
 
+@dataclass(slots=True)
+class ConfigUpgradeResult:
+    path: Path
+    changed: bool
+    backup_path: Path | None
+    added_paths: list[str]
+
+
 ROLE_FAMILY_NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
-def init_config(destination: Path = Path("config.yaml")) -> str:
+def init_config(destination: Path = Path("config.yaml"), *, overwrite: bool = False) -> str:
     """Create a config file from the example when one does not already exist."""
     destination = destination.expanduser()
     display_path = destination.resolve(strict=False)
-    if destination.exists():
+    if destination.exists() and not overwrite:
         return f"{display_path} already exists; leaving it unchanged."
 
     try:
         destination.parent.mkdir(parents=True, exist_ok=True)
+        backup_path = None
+        if destination.exists():
+            backup_path = next_backup_path(destination)
+            shutil.copy2(destination, backup_path)
         source = find_config_example()
-        if source is not None:
+        if source is not None and source.resolve(strict=False) != display_path:
             shutil.copyfile(source, destination)
         else:
             destination.write_text(DEFAULT_CONFIG_EXAMPLE, encoding="utf-8")
     except OSError as exc:
         raise ConfigError([f"{display_path} could not be created: {exc}"]) from exc
+    if backup_path is not None:
+        return f"Replaced {display_path} with default commented settings. Backup written to {backup_path}."
     return f"Created {display_path} with default commented settings."
+
+
+def next_backup_path(path: Path) -> Path:
+    backup_path = path.with_name(path.name + ".bak")
+    index = 1
+    while backup_path.exists():
+        backup_path = path.with_name(f"{path.name}.bak.{index}")
+        index += 1
+    return backup_path
+
+
+def upgrade_config(path: Path = Path("config.yaml")) -> ConfigUpgradeResult:
+    """Add missing default config settings without changing existing values."""
+    path = path.expanduser()
+    display_path = path.resolve(strict=False)
+    data = read_yaml_file(path)
+    default_data = read_default_config_data()
+    added_paths = missing_default_paths(data, default_data)
+    if not added_paths:
+        return ConfigUpgradeResult(display_path, changed=False, backup_path=None, added_paths=[])
+
+    merged = merge_missing_defaults(data, default_data)
+    try:
+        current_text = path.read_text(encoding="utf-8")
+        upgraded_text = render_upgraded_config_text(current_text, merged, added_paths)
+        backup_path = next_backup_path(path)
+        shutil.copy2(path, backup_path)
+        path.write_text(upgraded_text, encoding="utf-8")
+    except OSError as exc:
+        raise ConfigError([f"{display_path} could not be upgraded: {exc}"]) from exc
+    return ConfigUpgradeResult(
+        display_path,
+        changed=True,
+        backup_path=backup_path.resolve(strict=False),
+        added_paths=added_paths,
+    )
+
+
+def read_default_config_data() -> dict[str, Any]:
+    if yaml is None:
+        raise ConfigError(["PyYAML is required. Install with: python -m pip install PyYAML"])
+    source = find_config_example()
+    try:
+        if source is not None:
+            loaded = yaml.safe_load(source.read_text(encoding="utf-8"))
+        else:
+            loaded = yaml.safe_load(DEFAULT_CONFIG_EXAMPLE)
+    except (OSError, yaml.YAMLError) as exc:
+        raise ConfigError([f"Default config could not be read: {exc}"]) from exc
+    if not isinstance(loaded, dict):
+        raise ConfigError(["Default config must contain a YAML mapping at the top level."])
+    return loaded
+
+
+def missing_default_paths(data: dict[str, Any], defaults: dict[str, Any]) -> list[str]:
+    missing: list[str] = []
+
+    def visit(current: Any, default: Any, prefix: list[str]) -> None:
+        if not isinstance(default, dict):
+            return
+        if not isinstance(current, dict):
+            return
+        for key, default_value in default.items():
+            path = [*prefix, str(key)]
+            if key not in current:
+                missing.append(".".join(path))
+            elif isinstance(default_value, dict):
+                visit(current[key], default_value, path)
+
+    visit(data, defaults, [])
+    return missing
+
+
+def merge_missing_defaults(data: dict[str, Any], defaults: dict[str, Any]) -> dict[str, Any]:
+    merged = deepcopy(data)
+
+    def merge(current: dict[str, Any], default: dict[str, Any]) -> None:
+        for key, default_value in default.items():
+            if key not in current:
+                current[key] = deepcopy(default_value)
+            elif isinstance(current[key], dict) and isinstance(default_value, dict):
+                merge(current[key], default_value)
+
+    merge(merged, defaults)
+    return merged
+
+
+def render_upgraded_config_text(
+    current_text: str,
+    merged: dict[str, Any],
+    added_paths: list[str],
+) -> str:
+    default_text = default_config_text()
+    upgraded_text = current_text
+    for path in added_paths:
+        snippet = extract_default_block(default_text, path.split("."))
+        if snippet is None:
+            return yaml.safe_dump(merged, sort_keys=False)
+        upgraded_text = insert_config_block(upgraded_text, path.split("."), snippet)
+        if upgraded_text is None:
+            return yaml.safe_dump(merged, sort_keys=False)
+    try:
+        loaded = yaml.safe_load(upgraded_text)
+    except yaml.YAMLError:
+        return yaml.safe_dump(merged, sort_keys=False)
+    if not isinstance(loaded, dict) or missing_default_paths(loaded, merged):
+        return yaml.safe_dump(merged, sort_keys=False)
+    if not upgraded_text.endswith("\n"):
+        upgraded_text += "\n"
+    return upgraded_text
+
+
+def default_config_text() -> str:
+    source = find_config_example()
+    if source is not None:
+        try:
+            return source.read_text(encoding="utf-8")
+        except OSError:
+            return DEFAULT_CONFIG_EXAMPLE
+    return DEFAULT_CONFIG_EXAMPLE
+
+
+def extract_default_block(default_text: str, path: list[str]) -> str | None:
+    lines = default_text.splitlines()
+    located = find_key_line(lines, path)
+    if located is None:
+        return None
+    key_line, _ = located
+    indent = 2 * (len(path) - 1)
+    start = key_line
+    while start > 0 and is_associated_comment(lines[start - 1], indent):
+        start -= 1
+    end = key_line + 1
+    while end < len(lines):
+        stripped = lines[end].strip()
+        if stripped and line_indent(lines[end]) <= indent:
+            break
+        end += 1
+    snippet = "\n".join(lines[start:end]).strip("\n")
+    if not snippet:
+        return None
+    return snippet + "\n"
+
+
+def insert_config_block(text: str, path: list[str], snippet: str) -> str | None:
+    lines = text.splitlines()
+    if len(path) == 1:
+        if lines and lines[-1].strip():
+            lines.append("")
+        lines.extend(snippet.rstrip("\n").splitlines())
+        return "\n".join(lines) + "\n"
+
+    parent = path[:-1]
+    located = find_key_line(lines, parent)
+    if located is None:
+        return None
+    _, parent_end = located
+    insert_lines = snippet.rstrip("\n").splitlines()
+    before = lines[:parent_end]
+    after = lines[parent_end:]
+    if before and before[-1].strip():
+        before.append("")
+    return "\n".join([*before, *insert_lines, *after]) + "\n"
+
+
+def find_key_line(lines: list[str], path: list[str]) -> tuple[int, int] | None:
+    start = 0
+    end = len(lines)
+    key_line = None
+    for depth, key in enumerate(path):
+        indent = 2 * depth
+        key_line = None
+        for index in range(start, end):
+            if is_key_line(lines[index], key, indent):
+                key_line = index
+                break
+        if key_line is None:
+            return None
+        start = key_line + 1
+        end = find_block_end(lines, key_line, indent)
+    return key_line, end
+
+
+def find_block_end(lines: list[str], key_line: int, indent: int) -> int:
+    index = key_line + 1
+    while index < len(lines):
+        stripped = lines[index].strip()
+        if stripped and line_indent(lines[index]) <= indent:
+            break
+        index += 1
+    return index
+
+
+def is_key_line(line: str, key: str, indent: int) -> bool:
+    prefix = " " * indent + key + ":"
+    return line.startswith(prefix)
+
+
+def is_associated_comment(line: str, indent: int) -> bool:
+    stripped = line.strip()
+    if not stripped:
+        return True
+    return line_indent(line) == indent and stripped.startswith("#")
+
+
+def line_indent(line: str) -> int:
+    return len(line) - len(line.lstrip(" "))
 
 
 def find_config_example() -> Path | None:

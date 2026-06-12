@@ -2,7 +2,10 @@
 
 ## Unreleased
 
-## 0.1.4
+## 0.1.5
+
+- Add explicit config reset and user-data removal commands.
+- Add safe config upgrades that back up user configs and merge missing default settings.
 
 ## 0.1.3
 

@@ -82,20 +82,28 @@ labor-sieve init
 labor-sieve quickstart
 labor-sieve doctor
 labor-sieve validate-config
+labor-sieve config-upgrade
 labor-sieve list-options
 labor-sieve list-presets
 labor-sieve update-presets --index-url PRESET_INDEX_URL
 labor-sieve use-preset linux-sre
 labor-sieve run
+labor-sieve uninstall-data
 ```
 
 `labor-sieve init` creates the editable config file when it does not already exist. By default it uses `./config.yaml` if that file is already present, otherwise `~/labor-sieve/config.yaml`.
 
+`labor-sieve init --force` backs up an existing config to `config.yaml.bak` and replaces it with the packaged default config.
+
 `labor-sieve quickstart` creates `~/labor-sieve/config.yaml` when the file is missing, then prints setup instructions. Use `labor-sieve quickstart -c /path/to/config.yaml` to create or print instructions for a specific config location.
+
+`labor-sieve quickstart --reset-config` backs up the selected config and replaces it with the packaged default config before printing setup instructions.
 
 `labor-sieve doctor` checks the Python runtime, PyYAML, bundled config/presets, and `config.yaml`.
 
-`labor-sieve validate-config` validates `config.yaml` and prints human-readable errors.
+`labor-sieve validate-config` adds missing default settings when needed, validates `config.yaml`, and prints human-readable errors.
+
+`labor-sieve config-upgrade` backs up `config.yaml` and adds missing default settings from the installed package without changing existing values.
 
 `labor-sieve list-options` prints built-in seniority levels and role families.
 
@@ -105,7 +113,9 @@ labor-sieve run
 
 `labor-sieve use-preset PRESET` merges a preset into `config.yaml`, validates the result, and writes a `.bak` backup first.
 
-`labor-sieve run` uses enabled sources from the selected config file. The default config disables sample data and enables public remote sources with starter company lists.
+`labor-sieve run` adds missing default settings when needed, then uses enabled sources from the selected config file. The default config disables sample data and enables public remote sources with starter company lists.
+
+`labor-sieve uninstall-data` prints user data paths. `labor-sieve uninstall-data --yes` removes the default config/report directory, downloaded presets, and run logs before uninstalling the command.
 
 ## Configuration
 
@@ -124,6 +134,12 @@ Edit these fields in `config.yaml`:
 Role families are config-driven. Built-in families are listed in `labor-sieve list-options`. `role_family_weights` also accepts custom snake_case keys, and the scorer applies those weights to matching `role_family` values from sources and presets.
 
 Bundled presets are included with the installed package and update when the package is upgraded from PyPI. Downloaded presets live in `~/.config/labor-sieve/presets/` by default and override bundled presets with the same name.
+
+User configs are preserved across package upgrades. When a newer LaborSieve release adds config settings, `quickstart`, `validate-config`, and `run` add missing defaults automatically and write a `.bak` backup first. Existing values are left unchanged. To run this explicitly:
+
+```bash
+labor-sieve config-upgrade
+```
 
 ### Location Settings
 
@@ -385,6 +401,17 @@ Update the installed command from PyPI:
 
 ```bash
 pipx upgrade labor-sieve
+```
+
+## Uninstall
+
+`pipx uninstall labor-sieve` removes the installed command, but it does not remove `~/labor-sieve/config.yaml` or generated reports.
+
+To remove user data and then uninstall:
+
+```bash
+labor-sieve uninstall-data --yes
+pipx uninstall labor-sieve
 ```
 
 ## Scheduled Runs
