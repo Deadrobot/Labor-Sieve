@@ -20,6 +20,7 @@ def test_example_config_is_valid():
     assert errors == []
     config = config_from_data(data)
     assert config.seniority.min == "mid"
+    assert config.seniority.max == "senior"
     assert config.sources.sample.enabled is False
     assert config.sources.local_file.enabled is False
     assert config.sources.remoteok.enabled is True

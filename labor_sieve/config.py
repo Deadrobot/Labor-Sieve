@@ -26,7 +26,7 @@ DEFAULT_CONFIG_EXAMPLE = """# LaborSieve configuration.
 # entry, junior, mid, senior, staff, principal, executive
 seniority:
   min: mid
-  max: staff
+  max: senior
   allow_principal: false
   allow_executive: false
 

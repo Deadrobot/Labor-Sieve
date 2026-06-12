@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.1.11
+
+- Set default maximum seniority to senior.
+- Boost fleet operations reliability titles into P0 when location and other defaults align.
+- Cap trade, field-services, security, and service-desk titles below P1 by default.
+
 ## 0.1.10
 
 - Treat postings marked both remote and hybrid as hybrid for location scoring.

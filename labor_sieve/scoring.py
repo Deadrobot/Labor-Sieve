@@ -54,6 +54,8 @@ def score_job(job: Job, config: Config) -> ScoredJob:
         score += boost_points
         reasons.append(f"boost keywords +{boost_points}: {', '.join(boost_matches)}")
 
+    score += _title_focus_points(job, reasons)
+
     penalty_matches = _matching_keywords(searchable_text, config.keywords.penalize)
     if penalty_matches:
         penalty_points = len(penalty_matches) * 10
@@ -103,6 +105,17 @@ def _seniority_points(job: Job, config: Config, reasons: list[str]) -> float:
     points = max(0, 8 - (gap * 4))
     reasons.append(f"seniority {job.seniority} above target range; +{points}")
     return points
+
+
+def _title_focus_points(job: Job, reasons: list[str]) -> float:
+    title = job.title.casefold()
+    if re.search(r"\boperations engineer\b", title) and re.search(r"\bfleet reliability\b|\breliability\b", title):
+        reasons.append("fleet operations title focus +8")
+        return 8
+    if re.search(r"\boperations reliability engineer\b|\bfleet reliability\b", title):
+        reasons.append("fleet reliability title focus +8")
+        return 8
+    return 0
 
 
 def _location_points_and_cap(job: Job, config: Config, reasons: list[str]) -> tuple[float, float]:
@@ -197,6 +210,15 @@ def _title_scope_cap(job: Job, role_weight: float, reasons: list[str]) -> float:
     if job.role_family == "networking" and role_weight <= 0.35:
         cap = min(cap, 64)
         reasons.append("networking role family is low-weighted; capped below P1")
+    if re.search(r"\b(master electrician|electrician|superintendent|field services)\b", title):
+        cap = min(cap, 64)
+        reasons.append("trade or field-services title matched; capped below P1")
+    if re.search(r"\b(physical security|security engineer|detection and response|security regional lead)\b", title):
+        cap = min(cap, 64)
+        reasons.append("security title matched; capped below P1")
+    if re.search(r"\b(service desk|help desk|desktop support)\b", title):
+        cap = min(cap, 64)
+        reasons.append("service desk title matched; capped below P1")
     if re.search(r"\b(manager|director|vp|vice president|head of|chief)\b", title):
         cap = min(cap, 49)
         reasons.append("management title term matched; capped below P3")

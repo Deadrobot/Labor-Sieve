@@ -148,6 +148,33 @@ def test_on_site_outside_accepted_locations_is_capped_below_p1():
     assert any("outside accepted_locations" in reason for reason in item.reasons)
 
 
+def test_fleet_operations_engineer_reaches_p0_when_location_matches():
+    config = load_config()
+    item = score_job(
+        Job(
+            id="fleet-ops",
+            title="Operations Engineer, Fleet Reliability",
+            company="Example Co",
+            location="New York, NY / Plano, TX / Bellevue, WA / Sunnyvale, CA / Richmond, VA",
+            remote=False,
+            hybrid=False,
+            seniority="mid",
+            role_family="data_center_ops",
+            compensation_base_min=None,
+            url="https://example.invalid/jobs/fleet-ops",
+            description="Data center operations, fleet reliability, hardware automation, and troubleshooting.",
+            tags=["data center", "fleet", "reliability", "hardware"],
+            source="test",
+            source_id="fleet-ops",
+        ),
+        config,
+    )
+
+    assert item.priority == "P0"
+    assert item.score >= 90
+    assert any("fleet operations title focus" in reason for reason in item.reasons)
+
+
 def test_remote_restricted_outside_accepted_remote_locations_is_capped_below_p1():
     config = load_config()
     item = score_job(
@@ -281,6 +308,113 @@ def test_networking_role_family_is_capped_below_p1_by_default():
     assert item.priority not in {"P0", "P1"}
     assert item.score <= 64
     assert any("networking role family is low-weighted" in reason for reason in item.reasons)
+
+
+def test_trade_field_services_title_is_capped_below_p1():
+    config = load_config()
+    item = score_job(
+        Job(
+            id="master-electrician",
+            title="Master Electrician - Field Services",
+            company="Example Co",
+            location="Remote - US",
+            remote=True,
+            hybrid=False,
+            seniority="senior",
+            role_family="data_center_ops",
+            compensation_base_min=None,
+            url="https://example.invalid/jobs/master-electrician",
+            description="Data center hardware deployment, field services, and troubleshooting.",
+            tags=["data center", "hardware"],
+            source="test",
+            source_id="master-electrician",
+        ),
+        config,
+    )
+
+    assert item.priority not in {"P0", "P1"}
+    assert item.score <= 64
+    assert any("trade or field-services title matched" in reason for reason in item.reasons)
+
+
+def test_security_title_is_capped_below_p1():
+    config = load_config()
+    item = score_job(
+        Job(
+            id="physical-security",
+            title="Data Center Physical Security Regional Lead",
+            company="Example Co",
+            location="Remote - US",
+            remote=True,
+            hybrid=False,
+            seniority="senior",
+            role_family="data_center_ops",
+            compensation_base_min=162400,
+            url="https://example.invalid/jobs/physical-security",
+            description="Data center physical security operations and regional response.",
+            tags=["data center", "security"],
+            source="test",
+            source_id="physical-security",
+        ),
+        config,
+    )
+
+    assert item.priority not in {"P0", "P1"}
+    assert item.score <= 64
+    assert any("security title matched" in reason for reason in item.reasons)
+
+
+def test_service_desk_title_is_capped_below_p1():
+    config = load_config()
+    item = score_job(
+        Job(
+            id="service-desk",
+            title="Service Desk Analyst 11am 8pm",
+            company="Example Co",
+            location="Pennsylvania, Pennsylvania, United States",
+            remote=True,
+            hybrid=False,
+            seniority="mid",
+            role_family="data_center_ops",
+            compensation_base_min=None,
+            url="https://example.invalid/jobs/service-desk",
+            description="Customer support, troubleshooting, hardware, and operational response.",
+            tags=["customer support", "hardware"],
+            source="test",
+            source_id="service-desk",
+        ),
+        config,
+    )
+
+    assert item.priority not in {"P0", "P1"}
+    assert item.score <= 64
+    assert any("service desk title matched" in reason for reason in item.reasons)
+
+
+def test_staff_roles_are_above_default_seniority_range():
+    config = load_config()
+    item = score_job(
+        Job(
+            id="staff-platform",
+            title="Staff ML Engineer - ML Infrastructure",
+            company="Example Co",
+            location="Remote - US",
+            remote=True,
+            hybrid=False,
+            seniority="staff",
+            role_family="platform_ops",
+            compensation_base_min=None,
+            url="https://example.invalid/jobs/staff-platform",
+            description="Infrastructure automation reliability and capacity planning.",
+            tags=["infrastructure", "automation"],
+            source="test",
+            source_id="staff-platform",
+        ),
+        config,
+    )
+
+    assert item.priority not in {"P0", "P1"}
+    assert any("seniority staff above target range" in reason for reason in item.reasons)
 
 
 def test_manager_title_is_rejected_by_default():
