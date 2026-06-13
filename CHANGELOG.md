@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.1.13
+
+- Omit full job descriptions from generated txt, csv, json, and html reports.
+- Add collapsible buckets, collapsible job entries, and browser-local tracking controls to the static html report.
+- Lower the default compensation fallback floor and add seniority-specific compensation floors.
+
 ## 0.1.12
 
 - Add configurable language requirement penalties and boosts.

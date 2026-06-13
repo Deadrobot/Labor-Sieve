@@ -118,7 +118,18 @@ locations:
     - North America
 
 compensation:
-  minimum_base: 115000
+  # Fallback floor for recognized listed base compensation.
+  # Set to null to disable compensation scoring.
+  minimum_base: 85000
+  # Optional seniority-specific floors. Missing levels use minimum_base.
+  minimum_base_by_seniority:
+    entry: 85000
+    junior: 85000
+    mid: 95000
+    senior: 105000
+    staff: 115000
+    principal: 125000
+    executive: 125000
 
 # Exclude companies or specific postings from all future reports.
 # Add a report URL under urls, or add "source:source_id" under source_ids.

@@ -137,7 +137,18 @@ locations:
     - North America
 
 compensation:
-  minimum_base: 115000
+  # Fallback floor for recognized listed base compensation.
+  # Set to null to disable compensation scoring.
+  minimum_base: 85000
+  # Optional seniority-specific floors. Missing levels use minimum_base.
+  minimum_base_by_seniority:
+    entry: 85000
+    junior: 85000
+    mid: 95000
+    senior: 105000
+    staff: 115000
+    principal: 125000
+    executive: 125000
 
 # Exclude companies or specific postings from all future reports.
 # Add a report URL under urls, or add "source:source_id" under source_ids.
@@ -261,6 +272,7 @@ class LocationConfig:
 @dataclass(slots=True)
 class CompensationConfig:
     minimum_base: int | None
+    minimum_base_by_seniority: dict[str, int | None]
 
 
 @dataclass(slots=True)
@@ -774,6 +786,30 @@ def validate_config_data(data: dict[str, Any]) -> list[str]:
                 errors.append("compensation.minimum_base must be a non-negative number or null.")
             elif minimum < 0:
                 errors.append("compensation.minimum_base must be a non-negative number or null.")
+        minimum_by_seniority = _optional_mapping(
+            compensation,
+            "minimum_base_by_seniority",
+            errors,
+            label="compensation.minimum_base_by_seniority",
+        )
+        if minimum_by_seniority is not None:
+            for seniority, value in minimum_by_seniority.items():
+                if seniority not in SENIORITY_LEVELS:
+                    errors.append(
+                        "compensation.minimum_base_by_seniority keys must be seniority levels "
+                        f"(got {seniority!r})."
+                    )
+                if value is not None:
+                    if not isinstance(value, int | float) or isinstance(value, bool):
+                        errors.append(
+                            f"compensation.minimum_base_by_seniority.{seniority} "
+                            "must be a non-negative number or null."
+                        )
+                    elif value < 0:
+                        errors.append(
+                            f"compensation.minimum_base_by_seniority.{seniority} "
+                            "must be a non-negative number or null."
+                        )
 
     exclusions = _optional_mapping(data, "exclusions", errors)
     if exclusions is not None:
@@ -906,6 +942,10 @@ def config_from_data(data: dict[str, Any]) -> Config:
                 if compensation.get("minimum_base") is None
                 else int(compensation["minimum_base"])
             ),
+            minimum_base_by_seniority={
+                str(key): (None if value is None else int(value))
+                for key, value in compensation.get("minimum_base_by_seniority", {}).items()
+            },
         ),
         exclusions=ExclusionConfig(
             companies=_dedupe_strings([str(value) for value in exclusions.get("companies", [])]),

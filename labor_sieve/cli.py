@@ -668,7 +668,7 @@ def quickstart_text(config_path: Path, *, include_create: bool) -> str:
             "  Local-region settings are under locations.local_region and locations.accepted_locations.",
             "  Remote-region settings are under locations.accepted_remote_locations.",
             "  Seniority settings are under seniority; remote/local preferences are under locations.",
-            "  Compensation floor is under compensation.minimum_base.",
+            "  Compensation floors are under compensation.minimum_base and compensation.minimum_base_by_seniority.",
             "  Language requirement preferences are under language_requirements.",
             "  Company and posting exclusions are under exclusions.",
             "  Terminal summary limits are under output.terminal_p0_limit and output.terminal_p1_limit.",

@@ -175,6 +175,56 @@ def test_fleet_operations_engineer_reaches_p0_when_location_matches():
     assert any("fleet operations title focus" in reason for reason in item.reasons)
 
 
+def test_entry_compensation_uses_entry_floor():
+    config = load_config()
+    item = score_job(
+        Job(
+            id="entry-comp",
+            title="Data Center Operations Technician",
+            company="Example Co",
+            location="Remote - United States",
+            remote=True,
+            hybrid=False,
+            seniority="entry",
+            role_family="data_center_ops",
+            compensation_base_min=90000,
+            url="https://example.invalid/jobs/entry-comp",
+            description="Data center operations, hardware troubleshooting, and reliability.",
+            tags=["data center", "hardware"],
+            source="test",
+            source_id="entry-comp",
+        ),
+        config,
+    )
+
+    assert any("base compensation meets entry compensation floor $85,000" in reason for reason in item.reasons)
+
+
+def test_senior_compensation_uses_senior_floor():
+    config = load_config()
+    item = score_job(
+        Job(
+            id="senior-comp",
+            title="Senior Data Center Operations Engineer",
+            company="Example Co",
+            location="Remote - United States",
+            remote=True,
+            hybrid=False,
+            seniority="senior",
+            role_family="data_center_ops",
+            compensation_base_min=90000,
+            url="https://example.invalid/jobs/senior-comp",
+            description="Data center operations, hardware troubleshooting, and reliability.",
+            tags=["data center", "hardware"],
+            source="test",
+            source_id="senior-comp",
+        ),
+        config,
+    )
+
+    assert any("base compensation below senior compensation floor $105,000" in reason for reason in item.reasons)
+
+
 def test_site_reliability_engineer_reaches_p1_with_default_remote_us_scope():
     config = load_config()
     item = score_job(

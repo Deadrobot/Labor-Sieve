@@ -58,6 +58,10 @@ def test_example_config_is_valid():
     assert config.language_requirements.boost == []
     assert config.language_requirements.penalty == 8
     assert config.language_requirements.boost_points == 6
+    assert config.compensation.minimum_base == 85000
+    assert config.compensation.minimum_base_by_seniority["entry"] == 85000
+    assert config.compensation.minimum_base_by_seniority["mid"] == 95000
+    assert config.compensation.minimum_base_by_seniority["senior"] == 105000
 
 
 def test_validation_reports_seniority_order_error():
@@ -153,6 +157,50 @@ def test_validation_accepts_language_requirement_preferences():
     assert config.language_requirements.boost == ["korean"]
     assert config.language_requirements.penalty == 5
     assert config.language_requirements.boost_points == 7
+
+
+def test_validation_accepts_seniority_compensation_floors():
+    data = load_example()
+    data["compensation"]["minimum_base"] = 80000
+    data["compensation"]["minimum_base_by_seniority"] = {
+        "entry": 70000,
+        "mid": 90000,
+        "senior": 100000,
+        "staff": None,
+    }
+
+    errors = validate_config_data(data)
+    config = config_from_data(data)
+
+    assert errors == []
+    assert config.compensation.minimum_base == 80000
+    assert config.compensation.minimum_base_by_seniority == {
+        "entry": 70000,
+        "mid": 90000,
+        "senior": 100000,
+        "staff": None,
+    }
+
+
+def test_validation_reports_invalid_seniority_compensation_floors():
+    data = load_example()
+    data["compensation"]["minimum_base_by_seniority"] = {
+        "mid": -1,
+        "expert": 100000,
+        "senior": "high",
+    }
+
+    errors = validate_config_data(data)
+
+    assert "compensation.minimum_base_by_seniority keys must be seniority levels (got 'expert')." in errors
+    assert (
+        "compensation.minimum_base_by_seniority.mid must be a non-negative number or null."
+        in errors
+    )
+    assert (
+        "compensation.minimum_base_by_seniority.senior must be a non-negative number or null."
+        in errors
+    )
 
 
 def test_validation_reports_invalid_language_requirement_points():
@@ -252,6 +300,7 @@ def test_upgrade_config_adds_missing_defaults_without_changing_existing_values(t
     data["sources"].pop("ashby")
     data["sources"].pop("workday")
     data.pop("language_requirements")
+    data["compensation"].pop("minimum_base_by_seniority")
     data["locations"].pop("local_region")
     data["locations"].pop("accepted_remote_locations")
     data.pop("exclusions")
@@ -268,6 +317,7 @@ def test_upgrade_config_adds_missing_defaults_without_changing_existing_values(t
         "language_requirements",
         "locations.local_region",
         "locations.accepted_remote_locations",
+        "compensation.minimum_base_by_seniority",
         "exclusions",
         "output.terminal_p0_limit",
         "output.terminal_p1_limit",
@@ -283,6 +333,7 @@ def test_upgrade_config_adds_missing_defaults_without_changing_existing_values(t
     assert upgraded["locations"]["accepted_locations"] == ["Custom, VA"]
     assert upgraded["language_requirements"]["accepted"] == ["english"]
     assert upgraded["language_requirements"]["boost"] == []
+    assert upgraded["compensation"]["minimum_base_by_seniority"]["mid"] == 95000
     assert upgraded["locations"]["local_region"]["center"] == "Richmond, VA"
     assert "United States" in upgraded["locations"]["accepted_remote_locations"]
     assert upgraded["output"]["terminal_p0_limit"] == 10

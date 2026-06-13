@@ -235,18 +235,31 @@ def _normalized_location_text(value: str) -> str:
 
 
 def _compensation_points(job: Job, config: Config, reasons: list[str]) -> float:
-    minimum = config.compensation.minimum_base
+    minimum = _compensation_floor(job, config)
     if minimum is None:
         reasons.append("no compensation floor configured; +0")
         return 0
     if job.compensation_base_min is None:
         reasons.append("no base compensation listed; +3")
         return 3
+    floor_context = _compensation_floor_context(job, config)
     if job.compensation_base_min >= minimum:
-        reasons.append(f"base compensation meets minimum ${minimum:,}; +5")
+        reasons.append(f"base compensation meets {floor_context} ${minimum:,}; +5")
         return 5
-    reasons.append(f"base compensation below minimum ${minimum:,}; -15")
+    reasons.append(f"base compensation below {floor_context} ${minimum:,}; -15")
     return -15
+
+
+def _compensation_floor(job: Job, config: Config) -> int | None:
+    if job.seniority in config.compensation.minimum_base_by_seniority:
+        return config.compensation.minimum_base_by_seniority[job.seniority]
+    return config.compensation.minimum_base
+
+
+def _compensation_floor_context(job: Job, config: Config) -> str:
+    if job.seniority in config.compensation.minimum_base_by_seniority:
+        return f"{job.seniority} compensation floor"
+    return "minimum"
 
 
 def _language_requirement_points(job: Job, config: Config, reasons: list[str]) -> float:

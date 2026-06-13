@@ -42,6 +42,7 @@ def test_quickstart_prints_first_run_steps(tmp_path, monkeypatch, capsys):
     assert "locations.local_region" in output
     assert "locations.accepted_locations" in output
     assert "compensation.minimum_base" in output
+    assert "compensation.minimum_base_by_seniority" in output
     assert "language_requirements" in output
     assert "Company and posting exclusions are under exclusions." in output
     assert "sources.workday.sites" in output

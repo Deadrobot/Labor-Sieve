@@ -71,7 +71,7 @@ Reports are written under `output/` beside the config file by default:
 - `output/latest.json`
 - `output/latest.html`
 
-Run output prints source progress, scan counts, and P0/P1 summaries. The text report includes every job, including rejected jobs, grouped by priority bucket.
+Run output prints source progress, scan counts, and P0/P1 summaries. The text report includes every job, including rejected jobs, grouped by priority bucket. Reports include job links and scoring details, but omit full job descriptions so large runs stay readable. The static HTML report has collapsible priority buckets and job entries, plus browser-local tracking buttons for interested, applied, rejected, and hidden postings.
 
 Jobs are deduplicated before scoring. Exact URL matches are merged first, then normalized company/title/location matches. Reports show the selected source and any merged source references.
 
@@ -129,7 +129,8 @@ Edit these fields in `config.yaml`:
 - `keywords.penalize`: terms that lower a match.
 - `language_requirements`: languages that should be accepted or boosted when a posting lists language requirements.
 - `locations`: remote support, local-region notes, and accepted hybrid/on-site locations.
-- `compensation.minimum_base`: base-pay floor, or `null` to disable it.
+- `compensation.minimum_base`: fallback base-pay floor, or `null` to disable it.
+- `compensation.minimum_base_by_seniority`: optional base-pay floors by seniority level.
 - `exclusions`: companies, URLs, or source IDs to omit from future reports.
 - `output.terminal_p0_limit` and `output.terminal_p1_limit`: terminal summary limits.
 - `sources`: enabled job sources.
@@ -169,6 +170,21 @@ locations:
 Hybrid and on-site roles outside `accepted_locations` are capped below P1. Remote roles are accepted when their location is generic remote or matches `accepted_remote_locations`; remote roles restricted to other geographies are also capped below P1. If a posting is marked both remote and hybrid, LaborSieve treats it as hybrid so local-region rules apply.
 
 Network-specific titles are assigned to the `networking` role family. The default weight is intentionally low; raise `role_family_weights.networking` if those roles should rank higher.
+
+### Compensation Settings
+
+`compensation.minimum_base` is the fallback base-pay floor. `compensation.minimum_base_by_seniority` can set broader floors for each seniority level, so entry and junior searches do not use the same compensation threshold as senior or staff searches. Set a value to `null` to disable compensation scoring for that level.
+
+```yaml
+compensation:
+  minimum_base: 85000
+  minimum_base_by_seniority:
+    entry: 85000
+    junior: 85000
+    mid: 95000
+    senior: 105000
+    staff: 115000
+```
 
 ### Language Requirements
 
