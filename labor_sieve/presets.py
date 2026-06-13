@@ -14,9 +14,15 @@ from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
-from urllib.request import Request, urlopen
+from urllib.request import Request
 
-from .net import MAX_PRESET_BYTES, ResponseTooLargeError, read_response_limited
+from .net import (
+    MAX_PRESET_BYTES,
+    RedirectBlockedError,
+    ResponseTooLargeError,
+    open_without_redirects,
+    read_response_limited,
+)
 from .config import ConfigError, read_yaml_file, validate_config_data, yaml
 
 
@@ -313,14 +319,17 @@ def _download_json(url: str, timeout_seconds: int) -> dict[str, Any]:
 
 def _download_bytes(url: str, timeout_seconds: int) -> bytes:
     parsed = urlparse(url)
-    if parsed.scheme not in {"http", "https", "file"}:
-        raise PresetError([f"Unsupported URL scheme {parsed.scheme!r}. Use http, https, or file."])
+    if parsed.scheme not in {"https", "file"}:
+        raise PresetError([f"Unsupported URL scheme {parsed.scheme!r}. Use https or file."])
     request = Request(url, headers={"User-Agent": "labor-sieve/0.1"})
     try:
-        with urlopen(request, timeout=timeout_seconds) as response:
+        with open_without_redirects(request, timeout_seconds) as response:
             return read_response_limited(response, MAX_PRESET_BYTES, f"{url} response")
     except ResponseTooLargeError as exc:
         raise PresetError([str(exc)]) from exc
+    except RedirectBlockedError as exc:
+        detail = f" to {exc.location}" if exc.location else ""
+        raise PresetError([f"{url} redirected{detail}; redirects are not allowed."]) from exc
     except HTTPError as exc:
         raise PresetError([f"{url} returned HTTP {exc.code}."]) from exc
     except URLError as exc:

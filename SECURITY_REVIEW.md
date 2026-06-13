@@ -131,3 +131,41 @@ Publication hardening update on 2026-06-11:
 - Remote preset index generation now requires an explicit public HTTPS base URL.
 
 Keep this file current when findings are fixed or when new source adapters, report formats, install paths, or preset update behavior are added.
+
+## Pre-Release Hardening Update - 2026-06-13
+
+Scope: follow-up review for the 0.1.14 release after adding broad public sources, Workday, Ashby, report-tracking HTML, seniority-based compensation floors, and language-requirement scoring.
+
+### Findings Remediated
+
+| ID | Severity | Status | Area | Finding |
+| --- | --- | --- | --- | --- |
+| LS-PRESET-002 | Medium / P2 | Remediated | Remote presets | Preset indexes and preset files accepted `http://`, so an on-path attacker could rewrite both downloaded content and the index-provided checksum. |
+| LS-SOURCE-001 | Medium / P2 | Remediated | Remote sources | Configurable public-source `base_url` values only required an `https://` prefix and could be pointed at arbitrary HTTPS hosts. |
+| LS-DOS-002 | Medium / P2 | Remediated | Config validation | Source target lists and timeout values were not capped enough, allowing very long local runs from a malicious or bad config. |
+| LS-TERM-001 | Low / P3 | Remediated | Terminal/text output | Remote job text could preserve terminal control sequences into terminal summaries and text reports. |
+| LS-WORKDAY-001 | Low / P3 | Remediated | Workday reports | Unsafe Workday `externalPath` values could become external clickable report links. |
+| LS-RELEASE-001 | Low / P3 | Remediated | Release script | Release artifacts could be built while skipping tests when `pytest` was missing. |
+
+### Remediation Notes
+
+- Preset downloads now accept only `https://` and `file://`; `http://` is rejected before any request. Preset downloads also use the no-redirect opener.
+- `labor-sieve update-presets --timeout-seconds` is capped to the same maximum used by source configuration.
+- Public source API `base_url` settings are now validated against the expected upstream API endpoints for RemoteOK, Arbeitnow, Lever, and Ashby.
+- Source target lists are capped in config validation: local files, Greenhouse board tokens, Lever companies, Ashby organizations, and Workday sites.
+- Timeout values are capped in config validation.
+- Job text normalization strips ANSI/OSC terminal escape sequences and other control characters before fields reach reports.
+- Workday report URLs now fall back to the configured Workday site unless `externalPath` is a same-origin path.
+- `scripts/build-release.sh` now fails if `pytest` is unavailable instead of building untested artifacts.
+
+### Verification Commands
+
+Latest hardening verification passed on 2026-06-13:
+
+```bash
+python -m compileall labor_sieve tests
+.venv/bin/python -m pytest
+sh -n scripts/install.sh
+sh -n scripts/build-release.sh
+.venv/bin/python -m twine check dist/*
+```

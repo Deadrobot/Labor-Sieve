@@ -12,6 +12,16 @@ from labor_sieve.models import Job
 from labor_sieve.taxonomy import ROLE_FAMILIES, SENIORITY_LEVELS
 
 
+ANSI_ESCAPE_RE = re.compile(
+    r"\x1B(?:"
+    r"\][^\x07]*(?:\x07|\x1B\\)|"
+    r"\[[0-?]*[ -/]*[@-~]|"
+    r"[@-Z\\-_]"
+    r")"
+)
+CONTROL_CHARACTER_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")
+
+
 class _TextHTMLParser(HTMLParser):
     def __init__(self) -> None:
         super().__init__()
@@ -127,7 +137,7 @@ def first_string(record: dict[str, Any], *keys: str) -> str | None:
         return None
     if isinstance(value, dict):
         return normalize_location(value)
-    return str(value).strip() or None
+    return clean_text(str(value)) or None
 
 
 def first_bool(record: dict[str, Any], *keys: str) -> bool | None:
@@ -142,8 +152,8 @@ def normalize_location(value: Any) -> str | None:
         return None
     if isinstance(value, dict):
         name = value.get("name") or value.get("location")
-        return str(name).strip() if name else None
-    return str(value).strip() or None
+        return clean_text(str(name)) if name else None
+    return clean_text(str(value)) or None
 
 
 def normalize_tags(value: Any) -> list[str]:
@@ -155,13 +165,14 @@ def normalize_tags(value: Any) -> list[str]:
             if isinstance(item, dict):
                 name = item.get("name") or item.get("title") or item.get("value")
                 if name:
-                    tags.append(str(name).strip())
+                    tags.append(clean_text(str(name)))
             elif item not in (None, ""):
-                tags.append(str(item).strip())
+                tags.append(clean_text(str(item)))
         return [tag for tag in tags if tag]
     if isinstance(value, str):
-        return [part.strip() for part in re.split(r"[;,]", value) if part.strip()]
-    return [str(value).strip()]
+        return [cleaned for part in re.split(r"[;,]", value) if (cleaned := clean_text(part))]
+    cleaned = clean_text(str(value))
+    return [cleaned] if cleaned else []
 
 
 def normalize_name_list(value: Any) -> list[str]:
@@ -172,9 +183,9 @@ def normalize_name_list(value: Any) -> list[str]:
         if isinstance(item, dict):
             name = item.get("name") or item.get("title")
             if name:
-                names.append(str(name).strip())
+                names.append(clean_text(str(name)))
         elif item not in (None, ""):
-            names.append(str(item).strip())
+            names.append(clean_text(str(item)))
     return [name for name in names if name]
 
 
@@ -185,7 +196,7 @@ def normalize_category_tags(value: Any) -> list[str]:
     for key in ("team", "department", "location", "commitment", "level"):
         item = value.get(key)
         if item not in (None, ""):
-            tags.append(str(item).strip())
+            tags.append(clean_text(str(item)))
     return [tag for tag in tags if tag]
 
 
@@ -210,8 +221,10 @@ def _metadata_value_tags(value: Any) -> list[str]:
         return tags
     if isinstance(value, dict):
         name = value.get("name") or value.get("label") or value.get("value")
-        return [str(name).strip()] if name not in (None, "") else []
-    return [str(value).strip()]
+        cleaned = clean_text(str(name)) if name not in (None, "") else ""
+        return [cleaned] if cleaned else []
+    cleaned = clean_text(str(value))
+    return [cleaned] if cleaned else []
 
 
 def parse_bool(value: Any) -> bool:
@@ -255,13 +268,18 @@ def parse_money(value: Any) -> int | None:
 
 
 def clean_text(value: str) -> str:
-    text = html.unescape(value)
+    text = strip_terminal_controls(html.unescape(value))
     parser = _TextHTMLParser()
     parser.feed(text)
     parsed = parser.text()
     if parsed:
         text = parsed
-    return re.sub(r"\s+", " ", html.unescape(text)).strip()
+    return re.sub(r"\s+", " ", strip_terminal_controls(html.unescape(text))).strip()
+
+
+def strip_terminal_controls(value: str) -> str:
+    without_ansi = ANSI_ESCAPE_RE.sub(" ", value)
+    return CONTROL_CHARACTER_RE.sub(" ", without_ansi)
 
 
 def infer_remote(text: str) -> bool:

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from urllib.error import HTTPError, URLError
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import urlsplit
 from urllib.request import Request
 
 from labor_sieve.net import (
@@ -226,8 +226,6 @@ def workday_job_id(
 def workday_public_url(site: ParsedWorkdaySite, external_path: str) -> str:
     if is_safe_workday_path(external_path):
         return site.origin + external_path
-    if external_path:
-        return urljoin(site.base_url + "/", external_path)
     return site.base_url
 
 

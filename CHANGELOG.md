@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.14
+
+- Harden preset downloads, source URL validation, timeout/list caps, terminal text sanitization, Workday report links, and release test enforcement.
+
 ## 0.1.13
 
 - Omit full job descriptions from generated txt, csv, json, and html reports.

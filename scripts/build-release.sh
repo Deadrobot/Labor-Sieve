@@ -25,11 +25,11 @@ find . -type d -name __pycache__ -prune -exec rm -rf {} +
 
 "$PYTHON" -m compileall labor_sieve tests
 
-if "$PYTHON" -m pytest --version >/dev/null 2>&1; then
-  "$PYTHON" -m pytest
-else
-  echo "pytest is not installed; skipping tests. Install dev extras with: python -m pip install -e \".[dev]\"" >&2
+if ! "$PYTHON" -m pytest --version >/dev/null 2>&1; then
+  echo "pytest is not installed. Install dev extras with: python -m pip install -e \".[dev]\"" >&2
+  exit 1
 fi
+"$PYTHON" -m pytest
 
 if ! "$PYTHON" -m build --version >/dev/null 2>&1; then
   echo "build is not installed. Install dev extras with: python -m pip install -e \".[dev]\"" >&2

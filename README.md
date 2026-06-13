@@ -576,7 +576,7 @@ pipx upgrade labor-sieve
 The local installer script is for maintainer testing from an accessible checkout or local wheel:
 
 ```bash
-scripts/install.sh dist/labor_sieve-0.1.0-py3-none-any.whl
+scripts/install.sh dist/labor_sieve-VERSION-py3-none-any.whl
 ```
 
 Installer environment variables:

@@ -5,6 +5,7 @@ import yaml
 
 from labor_sieve import __version__
 from labor_sieve.cli import fetch_source_with_status, main
+from labor_sieve.config import MAX_TIMEOUT_SECONDS
 from labor_sieve.sources.sample import SampleSource
 
 
@@ -127,6 +128,20 @@ def test_uninstall_data_removes_user_paths(tmp_path, monkeypatch, capsys):
     output = capsys.readouterr().out
     assert "Removed" in output
     assert all(not path.exists() for path in paths)
+
+
+def test_update_presets_rejects_excessive_timeout(capsys):
+    assert main(
+        [
+            "update-presets",
+            "--index-url",
+            "file:///tmp/index.json",
+            "--timeout-seconds",
+            str(MAX_TIMEOUT_SECONDS + 1),
+        ]
+    ) == 1
+
+    assert f"--timeout-seconds must be an integer from 1 to {MAX_TIMEOUT_SECONDS}." in capsys.readouterr().err
 
 
 def test_config_upgrade_command_adds_missing_sections(tmp_path, capsys):

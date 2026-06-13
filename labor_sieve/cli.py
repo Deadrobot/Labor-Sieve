@@ -16,6 +16,7 @@ from .config import (
     Config,
     ConfigError,
     ConfigUpgradeResult,
+    MAX_TIMEOUT_SECONDS,
     built_in_options_text,
     find_config_example,
     init_config,
@@ -390,8 +391,8 @@ def cmd_list_presets(args: argparse.Namespace) -> int:
 
 
 def cmd_update_presets(args: argparse.Namespace) -> int:
-    if args.timeout_seconds <= 0:
-        print_errors(["--timeout-seconds must be a positive integer."])
+    if args.timeout_seconds <= 0 or args.timeout_seconds > MAX_TIMEOUT_SECONDS:
+        print_errors([f"--timeout-seconds must be an integer from 1 to {MAX_TIMEOUT_SECONDS}."])
         return 1
     try:
         results = update_presets(

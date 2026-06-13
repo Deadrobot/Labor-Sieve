@@ -19,6 +19,17 @@ except ImportError:  # pragma: no cover - exercised only in missing dependency i
     yaml = None
 
 
+MAX_TIMEOUT_SECONDS = 120
+MAX_LOCAL_FILE_PATHS = 100
+MAX_SOURCE_TARGETS = 100
+MAX_WORKDAY_SITES = 50
+
+REMOTEOK_BASE_URL = "https://remoteok.com/api"
+ARBEITNOW_BASE_URL = "https://www.arbeitnow.com/api/job-board-api"
+LEVER_BASE_URL = "https://api.lever.co/v0/postings"
+ASHBY_BASE_URL = "https://api.ashbyhq.com/posting-api/job-board"
+
+
 DEFAULT_CONFIG_EXAMPLE = """# LaborSieve configuration.
 # Created by labor-sieve quickstart or labor-sieve init.
 
@@ -838,20 +849,38 @@ def validate_config_data(data: dict[str, Any]) -> list[str]:
         local_file = _optional_mapping(sources, "local_file", errors, label="sources.local_file")
         if local_file is not None:
             _require_bool(local_file, "enabled", "sources.local_file.enabled", errors)
-            _require_string_list(local_file, "paths", "sources.local_file.paths", errors)
+            _require_string_list(
+                local_file,
+                "paths",
+                "sources.local_file.paths",
+                errors,
+                maximum_items=MAX_LOCAL_FILE_PATHS,
+            )
         remoteok = _optional_mapping(sources, "remoteok", errors, label="sources.remoteok")
         if remoteok is not None:
             _require_bool(remoteok, "enabled", "sources.remoteok.enabled", errors)
-            _require_positive_int(remoteok, "timeout_seconds", "sources.remoteok.timeout_seconds", errors)
+            _require_timeout_seconds(remoteok, "timeout_seconds", "sources.remoteok.timeout_seconds", errors)
             _require_int_range(remoteok, "max_jobs", "sources.remoteok.max_jobs", 1, 5000, errors)
-            _require_https_url(remoteok, "base_url", "sources.remoteok.base_url", errors)
+            _require_expected_https_url(
+                remoteok,
+                "base_url",
+                "sources.remoteok.base_url",
+                REMOTEOK_BASE_URL,
+                errors,
+            )
         arbeitnow = _optional_mapping(sources, "arbeitnow", errors, label="sources.arbeitnow")
         if arbeitnow is not None:
             _require_bool(arbeitnow, "enabled", "sources.arbeitnow.enabled", errors)
-            _require_positive_int(arbeitnow, "timeout_seconds", "sources.arbeitnow.timeout_seconds", errors)
+            _require_timeout_seconds(arbeitnow, "timeout_seconds", "sources.arbeitnow.timeout_seconds", errors)
             _require_int_range(arbeitnow, "max_pages", "sources.arbeitnow.max_pages", 1, 20, errors)
             _require_int_range(arbeitnow, "max_jobs", "sources.arbeitnow.max_jobs", 1, 5000, errors)
-            _require_https_url(arbeitnow, "base_url", "sources.arbeitnow.base_url", errors)
+            _require_expected_https_url(
+                arbeitnow,
+                "base_url",
+                "sources.arbeitnow.base_url",
+                ARBEITNOW_BASE_URL,
+                errors,
+            )
         greenhouse = _optional_mapping(sources, "greenhouse", errors, label="sources.greenhouse")
         if greenhouse is not None:
             _require_bool(greenhouse, "enabled", "sources.greenhouse.enabled", errors)
@@ -860,25 +889,50 @@ def validate_config_data(data: dict[str, Any]) -> list[str]:
                 "board_tokens",
                 "sources.greenhouse.board_tokens",
                 errors,
+                maximum_items=MAX_SOURCE_TARGETS,
             )
-            _require_positive_int(greenhouse, "timeout_seconds", "sources.greenhouse.timeout_seconds", errors)
+            _require_timeout_seconds(greenhouse, "timeout_seconds", "sources.greenhouse.timeout_seconds", errors)
         lever = _optional_mapping(sources, "lever", errors, label="sources.lever")
         if lever is not None:
             _require_bool(lever, "enabled", "sources.lever.enabled", errors)
-            _require_string_list(lever, "companies", "sources.lever.companies", errors)
-            _require_positive_int(lever, "timeout_seconds", "sources.lever.timeout_seconds", errors)
-            _require_https_url(lever, "base_url", "sources.lever.base_url", errors)
+            _require_string_list(
+                lever,
+                "companies",
+                "sources.lever.companies",
+                errors,
+                maximum_items=MAX_SOURCE_TARGETS,
+            )
+            _require_timeout_seconds(lever, "timeout_seconds", "sources.lever.timeout_seconds", errors)
+            _require_expected_https_url(
+                lever,
+                "base_url",
+                "sources.lever.base_url",
+                LEVER_BASE_URL,
+                errors,
+            )
         ashby = _optional_mapping(sources, "ashby", errors, label="sources.ashby")
         if ashby is not None:
             _require_bool(ashby, "enabled", "sources.ashby.enabled", errors)
-            _require_string_list(ashby, "organizations", "sources.ashby.organizations", errors)
-            _require_positive_int(ashby, "timeout_seconds", "sources.ashby.timeout_seconds", errors)
-            _require_https_url(ashby, "base_url", "sources.ashby.base_url", errors)
+            _require_string_list(
+                ashby,
+                "organizations",
+                "sources.ashby.organizations",
+                errors,
+                maximum_items=MAX_SOURCE_TARGETS,
+            )
+            _require_timeout_seconds(ashby, "timeout_seconds", "sources.ashby.timeout_seconds", errors)
+            _require_expected_https_url(
+                ashby,
+                "base_url",
+                "sources.ashby.base_url",
+                ASHBY_BASE_URL,
+                errors,
+            )
         workday = _optional_mapping(sources, "workday", errors, label="sources.workday")
         if workday is not None:
             _require_bool(workday, "enabled", "sources.workday.enabled", errors)
             _require_workday_sites(workday, errors)
-            _require_positive_int(workday, "timeout_seconds", "sources.workday.timeout_seconds", errors)
+            _require_timeout_seconds(workday, "timeout_seconds", "sources.workday.timeout_seconds", errors)
             _require_int_range(workday, "page_size", "sources.workday.page_size", 1, 100, errors)
             _require_int_range(
                 workday,
@@ -1092,16 +1146,17 @@ def _require_string_list(
     key: str,
     label: str,
     errors: list[str],
+    maximum_items: int | None = None,
 ) -> None:
     value = mapping.get(key)
     if not isinstance(value, list) or not all(_is_string(item) for item in value):
         errors.append(f"{label} must be a list of strings.")
+    elif maximum_items is not None and len(value) > maximum_items:
+        errors.append(f"{label} must contain no more than {maximum_items} items.")
 
 
-def _require_positive_int(mapping: dict[str, Any], key: str, label: str, errors: list[str]) -> None:
-    value = mapping.get(key)
-    if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
-        errors.append(f"{label} must be a positive integer.")
+def _require_timeout_seconds(mapping: dict[str, Any], key: str, label: str, errors: list[str]) -> None:
+    _require_int_range(mapping, key, label, 1, MAX_TIMEOUT_SECONDS, errors)
 
 
 def _require_non_negative_int(mapping: dict[str, Any], key: str, label: str, errors: list[str]) -> None:
@@ -1123,11 +1178,31 @@ def _require_int_range(
         errors.append(f"{label} must be an integer from {minimum} to {maximum}.")
 
 
-def _require_https_url(mapping: dict[str, Any], key: str, label: str, errors: list[str]) -> None:
+def _require_expected_https_url(
+    mapping: dict[str, Any],
+    key: str,
+    label: str,
+    expected: str,
+    errors: list[str],
+) -> None:
     if not _is_string(mapping.get(key)):
         errors.append(f"{label} must be a URL string.")
-    elif not str(mapping[key]).startswith("https://"):
-        errors.append(f"{label} must start with https://.")
+    elif _normalized_exact_url(str(mapping[key])) != _normalized_exact_url(expected):
+        errors.append(f"{label} must be exactly {expected}.")
+
+
+def _normalized_exact_url(value: str) -> tuple[str, str, str, str, str] | None:
+    parsed = urlsplit(value.strip())
+    host = parsed.hostname.casefold() if parsed.hostname else ""
+    try:
+        port = parsed.port
+    except ValueError:
+        return None
+    if parsed.scheme != "https" or not host or parsed.username or parsed.password or port is not None:
+        return None
+    if parsed.query or parsed.fragment:
+        return None
+    return (parsed.scheme, host, parsed.path.rstrip("/") or "/", "", "")
 
 
 def _require_workday_sites(mapping: dict[str, Any], errors: list[str]) -> None:
@@ -1135,6 +1210,8 @@ def _require_workday_sites(mapping: dict[str, Any], errors: list[str]) -> None:
     if not isinstance(sites, list):
         errors.append("sources.workday.sites must be a list of mappings.")
         return
+    if len(sites) > MAX_WORKDAY_SITES:
+        errors.append(f"sources.workday.sites must contain no more than {MAX_WORKDAY_SITES} items.")
     for index, site in enumerate(sites):
         label = f"sources.workday.sites[{index}]"
         if not isinstance(site, dict):

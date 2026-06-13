@@ -2,7 +2,15 @@ from pathlib import Path
 
 import yaml
 
-from labor_sieve.config import config_from_data, init_config, upgrade_config, validate_config_data
+from labor_sieve.config import (
+    MAX_SOURCE_TARGETS,
+    MAX_TIMEOUT_SECONDS,
+    MAX_WORKDAY_SITES,
+    config_from_data,
+    init_config,
+    upgrade_config,
+    validate_config_data,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -220,7 +228,7 @@ def test_validation_requires_https_for_lever_base_url():
 
     errors = validate_config_data(data)
 
-    assert "sources.lever.base_url must start with https://." in errors
+    assert "sources.lever.base_url must be exactly https://api.lever.co/v0/postings." in errors
 
 
 def test_validation_requires_https_for_ashby_base_url():
@@ -229,7 +237,55 @@ def test_validation_requires_https_for_ashby_base_url():
 
     errors = validate_config_data(data)
 
-    assert "sources.ashby.base_url must start with https://." in errors
+    assert "sources.ashby.base_url must be exactly https://api.ashbyhq.com/posting-api/job-board." in errors
+
+
+def test_validation_rejects_unexpected_source_base_urls():
+    data = load_example()
+    data["sources"]["remoteok"]["base_url"] = "https://127.0.0.1:8443/api"
+    data["sources"]["arbeitnow"]["base_url"] = "https://example.invalid/api"
+    data["sources"]["lever"]["base_url"] = "https://api.lever.co/v0/postings?mode=json"
+    data["sources"]["ashby"]["base_url"] = "https://api.ashbyhq.com/posting-api/job-board#fragment"
+
+    errors = validate_config_data(data)
+
+    assert "sources.remoteok.base_url must be exactly https://remoteok.com/api." in errors
+    assert (
+        "sources.arbeitnow.base_url must be exactly "
+        "https://www.arbeitnow.com/api/job-board-api."
+    ) in errors
+    assert "sources.lever.base_url must be exactly https://api.lever.co/v0/postings." in errors
+    assert (
+        "sources.ashby.base_url must be exactly "
+        "https://api.ashbyhq.com/posting-api/job-board."
+    ) in errors
+
+
+def test_validation_caps_source_target_counts_and_timeouts():
+    data = load_example()
+    data["sources"]["greenhouse"]["board_tokens"] = [
+        f"company-{index}" for index in range(MAX_SOURCE_TARGETS + 1)
+    ]
+    data["sources"]["lever"]["companies"] = [f"company-{index}" for index in range(MAX_SOURCE_TARGETS + 1)]
+    data["sources"]["ashby"]["organizations"] = [
+        f"company-{index}" for index in range(MAX_SOURCE_TARGETS + 1)
+    ]
+    data["sources"]["workday"]["sites"] = [
+        {
+            "company": f"Company {index}",
+            "url": f"https://example{index}.wd5.myworkdayjobs.com/External",
+        }
+        for index in range(MAX_WORKDAY_SITES + 1)
+    ]
+    data["sources"]["remoteok"]["timeout_seconds"] = MAX_TIMEOUT_SECONDS + 1
+
+    errors = validate_config_data(data)
+
+    assert f"sources.greenhouse.board_tokens must contain no more than {MAX_SOURCE_TARGETS} items." in errors
+    assert f"sources.lever.companies must contain no more than {MAX_SOURCE_TARGETS} items." in errors
+    assert f"sources.ashby.organizations must contain no more than {MAX_SOURCE_TARGETS} items." in errors
+    assert f"sources.workday.sites must contain no more than {MAX_WORKDAY_SITES} items." in errors
+    assert f"sources.remoteok.timeout_seconds must be an integer from 1 to {MAX_TIMEOUT_SECONDS}." in errors
 
 
 def test_validation_requires_workday_site_url():

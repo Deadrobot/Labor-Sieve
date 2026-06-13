@@ -12,9 +12,21 @@ from labor_sieve.sources.base import SourceError
 from labor_sieve.sources.greenhouse import GreenhouseSource
 from labor_sieve.sources.lever import LeverSource, normalize_lever_record
 from labor_sieve.sources.local_file import LocalFileSource
-from labor_sieve.sources.normalization import infer_role_family, normalize_job_record, parse_money, resolve_workplace_flags
+from labor_sieve.sources.normalization import (
+    clean_text,
+    infer_role_family,
+    normalize_job_record,
+    parse_money,
+    resolve_workplace_flags,
+)
 from labor_sieve.sources.remoteok import RemoteOkSource
-from labor_sieve.sources.workday import WorkdaySite, WorkdaySource, normalize_workday_record, parse_workday_site
+from labor_sieve.sources.workday import (
+    WorkdaySite,
+    WorkdaySource,
+    normalize_workday_record,
+    parse_workday_site,
+    workday_public_url,
+)
 
 
 def test_local_file_source_reads_csv_records(tmp_path):
@@ -203,6 +215,18 @@ def test_normalization_handles_workday_style_record():
     assert job.role_family == "sre_infra_ops"
     assert job.compensation_base_min == 140000
     assert "Full time" in job.tags
+
+
+def test_workday_public_url_falls_back_for_unsafe_external_path():
+    site = parse_workday_site(
+        WorkdaySite(
+            company="Example Company",
+            url="https://example.wd5.myworkdayjobs.com/ExampleExternalCareerSite",
+        )
+    )
+
+    assert workday_public_url(site, "https://evil.example/apply") == site.base_url
+    assert workday_public_url(site, "//evil.example/apply") == site.base_url
 
 
 def test_lever_source_fetches_postings(monkeypatch):
@@ -670,6 +694,28 @@ def test_remote_inference_uses_location_not_description_policy_text():
 
     assert job.remote is False
     assert job.hybrid is False
+
+
+def test_clean_text_strips_terminal_control_sequences():
+    assert clean_text("Ops\x1b]52;c;SGVsbG8=\x07Engineer\x1b[31m") == "Ops Engineer"
+
+    job = normalize_job_record(
+        {
+            "id": "job-\x1b[31m1",
+            "title": "Ops\x1b]52;c;SGVsbG8=\x07Engineer",
+            "company": "Example\x1b[31m Co",
+            "location": "Remote\x1b[31m - United States",
+            "description": "Linux\x1b[31m operations.",
+            "tags": ["fleet\x1b[31m"],
+            "url": "https://example.invalid/jobs/1",
+        },
+        source_name="test",
+        index=1,
+    )
+
+    combined = " ".join([job.id, job.title, job.company, job.location, job.description, *job.tags])
+    assert "\x1b" not in combined
+    assert "\x07" not in combined
 
 
 def test_greenhouse_source_rejects_oversized_response(monkeypatch):

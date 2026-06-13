@@ -111,3 +111,32 @@ def test_preset_download_rejects_oversized_file_uri(tmp_path, monkeypatch):
 
     with pytest.raises(PresetError, match="larger than the 5 byte limit"):
         _download_bytes(path.as_uri(), timeout_seconds=20)
+
+
+def test_preset_download_rejects_http_url():
+    with pytest.raises(PresetError, match="Unsupported URL scheme 'http'"):
+        _download_bytes("http://example.invalid/preset.yaml", timeout_seconds=20)
+
+
+def test_update_presets_skips_http_preset_entry(tmp_path):
+    index = tmp_path / "index.json"
+    index.write_text(
+        json.dumps(
+            {
+                "presets": [
+                    {
+                        "name": "field-enable",
+                        "url": "http://example.invalid/field-enable.yaml",
+                        "sha256": "0" * 64,
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    results = update_presets(index.as_uri(), preset_dir=tmp_path / "downloaded")
+
+    assert len(results) == 1
+    assert results[0].skipped is True
+    assert "Unsupported URL scheme 'http'" in results[0].message
