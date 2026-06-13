@@ -390,6 +390,81 @@ def test_language_requirement_boosts_custom_configured_language_phrase():
     assert not any("language requirement" in reason for reason in item.reasons)
 
 
+def test_language_requirement_treats_asl_as_neutral_by_default():
+    config = load_config()
+    item = score_job(
+        Job(
+            id="asl-neutral",
+            title="Operations Reliability Engineer",
+            company="Example Co",
+            location="Remote - US",
+            remote=True,
+            hybrid=False,
+            seniority="mid",
+            role_family="fleet_reliability",
+            compensation_base_min=None,
+            url="https://example.invalid/jobs/asl-neutral",
+            description="ASL proficiency preferred. Fleet reliability and troubleshooting.",
+            tags=["fleet", "reliability"],
+            source="test",
+            source_id="asl-neutral",
+        ),
+        config,
+    )
+
+    assert not any("language requirement" in reason for reason in item.reasons)
+
+
+def test_language_requirement_treats_american_sign_language_as_neutral_by_default():
+    config = load_config()
+    item = score_job(
+        Job(
+            id="american-sign-language-neutral",
+            title="Operations Reliability Engineer",
+            company="Example Co",
+            location="Remote - US",
+            remote=True,
+            hybrid=False,
+            seniority="mid",
+            role_family="fleet_reliability",
+            compensation_base_min=None,
+            url="https://example.invalid/jobs/american-sign-language-neutral",
+            description="American Sign Language proficiency preferred. Fleet reliability and troubleshooting.",
+            tags=["fleet", "reliability"],
+            source="test",
+            source_id="american-sign-language-neutral",
+        ),
+        config,
+    )
+
+    assert not any("language requirement" in reason for reason in item.reasons)
+
+
+def test_language_requirement_does_not_penalize_bilingual_asl_by_default():
+    config = load_config()
+    item = score_job(
+        Job(
+            id="bilingual-asl-neutral",
+            title="Operations Reliability Engineer",
+            company="Example Co",
+            location="Remote - US",
+            remote=True,
+            hybrid=False,
+            seniority="mid",
+            role_family="fleet_reliability",
+            compensation_base_min=None,
+            url="https://example.invalid/jobs/bilingual-asl-neutral",
+            description="Bilingual required. ASL proficiency preferred. Fleet reliability and troubleshooting.",
+            tags=["fleet", "reliability"],
+            source="test",
+            source_id="bilingual-asl-neutral",
+        ),
+        config,
+    )
+
+    assert not any("language requirement" in reason for reason in item.reasons)
+
+
 def test_remote_restricted_outside_accepted_remote_locations_is_capped_below_p1():
     config = load_config()
     item = score_job(

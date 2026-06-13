@@ -12,6 +12,8 @@ from .taxonomy import SENIORITY_LEVELS, seniority_index
 LANGUAGE_REQUIREMENT_TERMS = (
     "bilingual",
     "multilingual",
+    "asl",
+    "american sign language",
     "spanish",
     "french",
     "german",
@@ -32,6 +34,13 @@ LANGUAGE_REQUIREMENT_TERMS = (
     "norwegian",
     "danish",
     "hindi",
+)
+
+NEUTRAL_LANGUAGE_REQUIREMENT_TERMS = frozenset(
+    {
+        "asl",
+        "american sign language",
+    }
 )
 
 LANGUAGE_REQUIREMENT_CONTEXT = (
@@ -274,7 +283,7 @@ def _language_requirement_points(job: Job, config: Config, reasons: list[str]) -
         for language in config.language_requirements.boost
         if language.strip()
     }
-    allowed = accepted | boosted
+    allowed = accepted | boosted | NEUTRAL_LANGUAGE_REQUIREMENT_TERMS
     detected = _language_requirement_matches(_job_text(job), _language_requirement_terms(allowed))
     if not detected:
         return 0

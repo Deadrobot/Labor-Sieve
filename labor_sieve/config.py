@@ -102,6 +102,7 @@ keywords:
     - people management
 
 # Explicit language requirements are penalized unless listed under accepted.
+# ASL and American Sign Language are treated neutrally by default.
 # Add any language or phrase under accepted or boost as needed.
 # Leave boost empty unless language requirements should raise a posting's score.
 language_requirements:

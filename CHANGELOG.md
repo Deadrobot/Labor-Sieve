@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.1.15
+
+- Treat ASL and American Sign Language language requirements as neutral by default.
+- Improve public README install and first-run instructions.
+
 ## 0.1.14
 
 - Harden preset downloads, source URL validation, timeout/list caps, terminal text sanitization, Workday report links, and release test enforcement.

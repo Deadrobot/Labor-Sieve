@@ -211,7 +211,7 @@ compensation:
 
 ### Language Requirements
 
-The default config accepts English and penalizes explicit bilingual or non-English language requirements. Add languages or language phrases under `accepted` when those requirements should not lower a posting. Add terms under `boost` when those requirements should improve a posting.
+The default config accepts English and penalizes explicit bilingual or non-accepted language requirements. ASL and American Sign Language are treated neutrally by default. Add other languages or language phrases under `accepted` when those requirements should not lower a posting. Add terms under `boost` when those requirements should improve a posting.
 
 ```yaml
 language_requirements:
