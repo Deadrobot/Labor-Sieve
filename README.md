@@ -2,78 +2,119 @@
 
 LaborSieve is a Linux-first command-line job search and reporting tool for operations, infrastructure, data center, SRE, logistics/process, and support-adjacent roles.
 
-Current scope:
+It is intentionally small:
 
 - One editable `config.yaml`
-- One command to run
-- P0/P1 matches printed in the terminal
-- Full readable text report written to disk
-- Optional CSV, JSON, and static HTML reports
+- One command to run after setup
+- Terminal summary for P0/P1 matches
+- Full reports written to disk
+- Text report first, with optional CSV, JSON, and static HTML
 - No dashboard, database, background service, Docker, reverse proxy, or resume parser
 
-## Quick Start
+## Install And First Run
 
-Install the published command on a Linux machine:
+LaborSieve requires Linux or another Unix-like shell, Python 3.10 or newer, and `pipx`.
+
+Check Python:
+
+```bash
+python3 --version
+```
+
+If Python or `pipx` is missing, install them with your system package manager. Common Linux examples:
+
+```bash
+# Debian/Ubuntu
+sudo apt update
+sudo apt install python3 python3-venv pipx
+
+# Fedora
+sudo dnf install python3 pipx
+
+# Arch
+sudo pacman -S python python-pipx
+
+pipx ensurepath
+```
+
+Open a new terminal if `pipx ensurepath` says the shell path changed.
+
+References:
+
+- [Python on Unix platforms](https://docs.python.org/3/using/unix.html)
+- [pipx installation guide](https://pipx.pypa.io/stable/installation/)
+- [LaborSieve on PyPI](https://pypi.org/project/labor-sieve/)
+
+Install LaborSieve:
 
 ```bash
 pipx install labor-sieve
 ```
 
-If `pipx` is not installed:
-
-```bash
-# Debian/Ubuntu
-sudo apt install pipx
-
-# Fedora
-sudo dnf install pipx
-
-# Arch
-sudo pacman -S python-pipx
-
-pipx ensurepath
-```
-
-Create the default config, review the file locations, and run a scan:
+Create the default config, review the file locations, and run:
 
 ```bash
 labor-sieve quickstart
-# edit ~/labor-sieve/config.yaml with your preferred text editor
+# open ~/labor-sieve/config.yaml in your preferred text editor
 labor-sieve validate-config
 labor-sieve run
 ```
 
-`labor-sieve quickstart` creates `~/labor-sieve/config.yaml` with the default commented configuration when the file is missing. Edit that file directly; a separate example file is not needed for normal use. Default reports are written under `~/labor-sieve/output/`.
+`labor-sieve quickstart` creates `~/labor-sieve/config.yaml` when the file is missing. That file contains the default commented configuration; a separate example file is not needed for normal use.
 
-If `labor-sieve` is not found after install, add `~/.local/bin` to the shell path:
+Default reports are written under `~/labor-sieve/output/`:
+
+- `latest.txt`
+- `latest.csv`
+- `latest.json`
+- `latest.html`
+
+If `labor-sieve` is not found after install:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-Developer install from a checkout:
+## What To Edit First
+
+Open `~/labor-sieve/config.yaml` and review:
+
+- `locations`: remote support, Richmond-area defaults, accepted hybrid/on-site locations, and accepted remote regions.
+- `seniority`: minimum and maximum seniority.
+- `compensation`: fallback and seniority-specific compensation floors.
+- `keywords.boost` and `keywords.penalize`: terms that raise or lower a posting's score.
+- `language_requirements`: language requirements to accept, boost, or penalize.
+- `role_family_weights`: how strongly each role family should rank.
+- `exclusions`: companies, URLs, or source IDs to hide from future reports.
+- `sources`: enabled job sources and configured ATS company lists.
+
+The default config is centered on Richmond, VA with a 40-mile local-region note. LaborSieve does not geocode. Local matching is controlled by the strings in `locations.accepted_locations`, so update that list when using a different city or metro area.
+
+## Running
+
+Run from any directory:
 
 ```bash
-python3 -m venv .venv
-. .venv/bin/activate
-python -m pip install -e ".[dev]"
-
-labor-sieve quickstart -c config.yaml
-# edit config.yaml with your preferred text editor
-labor-sieve validate-config -c config.yaml
-labor-sieve run -c config.yaml
+labor-sieve run
 ```
 
-Reports are written under `output/` beside the config file by default:
+`labor-sieve run` uses `./config.yaml` if one exists, otherwise `~/labor-sieve/config.yaml`.
 
-- `output/latest.txt`
-- `output/latest.csv`
-- `output/latest.json`
-- `output/latest.html`
+While sources are fetching, LaborSieve prints source progress and elapsed time. A live run can take several minutes, especially when Workday sites are enabled.
 
-Run output prints source progress, scan counts, and P0/P1 summaries. The text report includes every job, including rejected jobs, grouped by priority bucket. Reports include job links and scoring details, but omit full job descriptions so large runs stay readable. The static HTML report has collapsible priority buckets and job entries, plus browser-local tracking buttons for interested, applied, rejected, and hidden postings.
+Read the primary text report:
 
-Jobs are deduplicated before scoring. Exact URL matches are merged first, then normalized company/title/location matches. Reports show the selected source and any merged source references.
+```bash
+less ~/labor-sieve/output/latest.txt
+```
+
+Open the static HTML report in a browser. On desktop Linux, if `xdg-open` is available:
+
+```bash
+xdg-open ~/labor-sieve/output/latest.html
+```
+
+The HTML report is local-only. It has collapsible priority buckets and job entries, plus browser-local tracking buttons for interested, applied, rejected, and hidden postings.
 
 ## Commands
 
@@ -93,17 +134,15 @@ labor-sieve uninstall-data
 
 `labor-sieve init` creates the editable config file when it does not already exist. By default it uses `./config.yaml` if that file is already present, otherwise `~/labor-sieve/config.yaml`.
 
-`labor-sieve init --force` backs up an existing config to `config.yaml.bak` and replaces it with the packaged default config.
+`labor-sieve quickstart` creates `~/labor-sieve/config.yaml` when the file is missing, then prints setup instructions. Use `labor-sieve quickstart -c /path/to/config.yaml` for a specific config location.
 
-`labor-sieve quickstart` creates `~/labor-sieve/config.yaml` when the file is missing, then prints setup instructions. Use `labor-sieve quickstart -c /path/to/config.yaml` to create or print instructions for a specific config location.
-
-`labor-sieve quickstart --reset-config` backs up the selected config and replaces it with the packaged default config before printing setup instructions.
-
-`labor-sieve doctor` checks the Python runtime, PyYAML, bundled config/presets, and `config.yaml`.
+`labor-sieve quickstart --reset-config` backs up the selected config and replaces it with the packaged default config.
 
 `labor-sieve validate-config` adds missing default settings when needed, validates `config.yaml`, and prints human-readable errors.
 
 `labor-sieve config-upgrade` backs up `config.yaml` and adds missing default settings from the installed package without changing existing values.
+
+`labor-sieve doctor` checks the Python runtime, PyYAML, bundled config/presets, and selected config file.
 
 `labor-sieve list-options` prints built-in seniority levels and role families.
 
@@ -113,41 +152,29 @@ labor-sieve uninstall-data
 
 `labor-sieve use-preset PRESET` merges a preset into `config.yaml`, validates the result, and writes a `.bak` backup first.
 
-`labor-sieve run` adds missing default settings when needed, then uses enabled sources from the selected config file. The default config disables sample data, enables RemoteOK for broad discovery, and enables public ATS starter company lists.
+`labor-sieve run` adds missing default settings when needed, then uses enabled sources from the selected config file.
 
-`labor-sieve uninstall-data` prints user data paths. `labor-sieve uninstall-data --yes` removes the default config/report directory, downloaded presets, and run logs before uninstalling the command.
+`labor-sieve uninstall-data` prints user data paths. `labor-sieve uninstall-data --yes` removes the default config/report directory, downloaded presets, and run logs.
 
-## Configuration
+## Configuration Notes
 
-The default configuration prioritizes production operations, infrastructure, Linux/SRE, data center, logistics/process, and implementation-support roles around Richmond, VA. Broad public and configured ATS sources are enabled by default, so the first real run can take several minutes.
+User configs are preserved across package upgrades. When a newer LaborSieve release adds config settings, `quickstart`, `validate-config`, and `run` add missing defaults automatically and write a `.bak` backup first. Existing values are left unchanged.
 
-Edit these fields in `config.yaml`:
-
-- `seniority`: minimum and maximum target seniority.
-- `role_family_weights`: higher values increase priority for a role family.
-- `keywords.boost`: terms that improve a match.
-- `keywords.penalize`: terms that lower a match.
-- `language_requirements`: languages that should be accepted or boosted when a posting lists language requirements.
-- `locations`: remote support, local-region notes, and accepted hybrid/on-site locations.
-- `compensation.minimum_base`: fallback base-pay floor, or `null` to disable it.
-- `compensation.minimum_base_by_seniority`: optional base-pay floors by seniority level.
-- `exclusions`: companies, URLs, or source IDs to omit from future reports.
-- `output.terminal_p0_limit` and `output.terminal_p1_limit`: terminal summary limits.
-- `sources`: enabled job sources.
-
-Role families are config-driven. Built-in families are listed in `labor-sieve list-options`. `role_family_weights` also accepts custom snake_case keys, and the scorer applies those weights to matching `role_family` values from sources and presets.
-
-Bundled presets are included with the installed package and update when the package is upgraded from PyPI. Downloaded presets live in `~/.config/labor-sieve/presets/` by default and override bundled presets with the same name.
-
-User configs are preserved across package upgrades. When a newer LaborSieve release adds config settings, `quickstart`, `validate-config`, and `run` add missing defaults automatically and write a `.bak` backup first. Existing values are left unchanged. To run this explicitly:
+To upgrade config settings explicitly:
 
 ```bash
 labor-sieve config-upgrade
 ```
 
-### Location Settings
+To replace the current config with packaged defaults:
 
-The default config is centered on Richmond, VA with a 40-mile local-region note:
+```bash
+labor-sieve quickstart --reset-config
+```
+
+### Location
+
+Default location settings:
 
 ```yaml
 locations:
@@ -165,15 +192,11 @@ locations:
     - North America
 ```
 
-`local_region.center` and `radius_miles` describe the intended search area. LaborSieve does not geocode locations; it matches job-posting location text against `accepted_locations`. To use another city, change the center/radius note and replace `accepted_locations` with nearby city, county, or metro strings that should count as local.
-
 Hybrid and on-site roles outside `accepted_locations` are capped below P1. Remote roles are accepted when their location is generic remote or matches `accepted_remote_locations`; remote roles restricted to other geographies are also capped below P1. If a posting is marked both remote and hybrid, LaborSieve treats it as hybrid so local-region rules apply.
 
-Network-specific titles are assigned to the `networking` role family. The default weight is intentionally low; raise `role_family_weights.networking` if those roles should rank higher.
+### Compensation
 
-### Compensation Settings
-
-`compensation.minimum_base` is the fallback base-pay floor. `compensation.minimum_base_by_seniority` can set broader floors for each seniority level, so entry and junior searches do not use the same compensation threshold as senior or staff searches. Set a value to `null` to disable compensation scoring for that level.
+`compensation.minimum_base` is the fallback base-pay floor. `compensation.minimum_base_by_seniority` can set broader floors for each seniority level. Set a value to `null` to disable compensation scoring for that level.
 
 ```yaml
 compensation:
@@ -188,18 +211,13 @@ compensation:
 
 ### Language Requirements
 
-The default config accepts English and penalizes explicit bilingual or non-English language requirements. Add languages or language phrases under `accepted` when those requirements should not lower a posting. Add terms under `boost` when those requirements should improve a posting. The commented entries are examples, not a fixed supported-language list.
+The default config accepts English and penalizes explicit bilingual or non-English language requirements. Add languages or language phrases under `accepted` when those requirements should not lower a posting. Add terms under `boost` when those requirements should improve a posting.
 
 ```yaml
 language_requirements:
   accepted:
     - english
-    # - spanish
-    # - korean
-    # - american sign language
-  boost:
-    # - bilingual
-    # - spanish
+  boost: []
   penalty: 8
   boost_points: 6
 ```
@@ -220,6 +238,84 @@ exclusions:
 
 Company names are matched case-insensitively. URLs are normalized before matching. Source IDs can be copied from the text report; use either the raw source ID or `source:source_id`.
 
+## Sources
+
+Available sources:
+
+- `remoteok`: broad public RemoteOK API listings across many companies.
+- `arbeitnow`: broad public Arbeitnow API listings. Disabled by default because it is noisier for a US-centered search.
+- `greenhouse`: configured Greenhouse Job Board API boards.
+- `lever`: configured Lever Postings API companies.
+- `ashby`: configured Ashby job board organizations.
+- `workday`: configured Workday candidate experience sites.
+- `local_file`: local `.csv`, `.json`, `.yaml`, or `.yml` exports.
+- `sample`: synthetic jobs for scoring/report smoke tests. Disabled by default.
+
+The default config disables sample data, enables RemoteOK, disables Arbeitnow, and enables starter lists for Greenhouse, Lever, Ashby, and Workday.
+
+RemoteOK and Arbeitnow are broad sources. Greenhouse, Lever, Ashby, and Workday only scan the boards, companies, organizations, or sites listed in `config.yaml`.
+
+Example source entries:
+
+```yaml
+sources:
+  remoteok:
+    enabled: true
+    timeout_seconds: 20
+    max_jobs: 250
+    base_url: https://remoteok.com/api
+
+  greenhouse:
+    enabled: true
+    board_tokens:
+      - coreweave
+      - nebius
+    timeout_seconds: 20
+
+  lever:
+    enabled: true
+    companies:
+      - waabi
+    timeout_seconds: 20
+    base_url: https://api.lever.co/v0/postings
+
+  ashby:
+    enabled: true
+    organizations:
+      - Lambda
+      - Crusoe
+    timeout_seconds: 30
+    base_url: https://api.ashbyhq.com/posting-api/job-board
+
+  workday:
+    enabled: true
+    sites:
+      - company: NVIDIA
+        url: https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite
+    timeout_seconds: 20
+    page_size: 20
+    max_jobs_per_site: 100
+```
+
+Local file records can include:
+
+```text
+title, company, location, remote, hybrid, seniority, role_family,
+compensation_base_min, url, description, tags
+```
+
+## Presets
+
+Bundled presets are included with the installed package and update when the package is upgraded from PyPI. Downloaded presets live in `~/.config/labor-sieve/presets/` by default and override bundled presets with the same name.
+
+Apply a bundled preset:
+
+```bash
+labor-sieve list-presets
+labor-sieve use-preset linux-sre
+labor-sieve validate-config
+```
+
 Download remote presets from a hosted preset index:
 
 ```bash
@@ -239,255 +335,6 @@ Remote preset indexes use this shape:
     }
   ]
 }
-```
-
-Apply a preset:
-
-```bash
-labor-sieve list-presets
-labor-sieve use-preset linux-sre -c ~/labor-sieve/config.yaml
-labor-sieve validate-config -c ~/labor-sieve/config.yaml
-```
-
-## Sources
-
-Available sources:
-
-- `sample`: synthetic jobs for scoring/report smoke tests
-- `local_file`: local `.csv`, `.json`, `.yaml`, or `.yml` exports
-- `remoteok`: broad public RemoteOK API listings across many companies
-- `arbeitnow`: broad public Arbeitnow API listings, disabled by default because it is noisier for a US-centered search
-- `greenhouse`: public Greenhouse Job Board API boards
-- `lever`: public Lever Postings API companies
-- `ashby`: public Ashby job board organizations
-- `workday`: public Workday candidate experience sites
-
-The default config disables sample data, enables RemoteOK, disables Arbeitnow, and enables starter lists for Greenhouse, Lever, Ashby, and Workday. `local_file` remains disabled until file paths are added.
-
-Example local file config:
-
-```yaml
-sources:
-  sample:
-    enabled: false
-  local_file:
-    enabled: true
-    paths:
-      - jobs.csv
-  remoteok:
-    enabled: false
-    timeout_seconds: 20
-    max_jobs: 250
-    base_url: https://remoteok.com/api
-  arbeitnow:
-    enabled: false
-    timeout_seconds: 20
-    max_pages: 1
-    max_jobs: 100
-    base_url: https://www.arbeitnow.com/api/job-board-api
-  greenhouse:
-    enabled: false
-    board_tokens: []
-    timeout_seconds: 20
-  lever:
-    enabled: false
-    companies: []
-    timeout_seconds: 20
-    base_url: https://api.lever.co/v0/postings
-  ashby:
-    enabled: false
-    organizations: []
-    timeout_seconds: 30
-    base_url: https://api.ashbyhq.com/posting-api/job-board
-  workday:
-    enabled: false
-    sites: []
-    timeout_seconds: 20
-    page_size: 20
-    max_jobs_per_site: 100
-```
-
-Local file records can include:
-
-```text
-title, company, location, remote, hybrid, seniority, role_family,
-compensation_base_min, url, description, tags
-```
-
-The focused examples below omit `remoteok` and `arbeitnow` for brevity. Leave, disable, or edit those sections independently.
-
-Example Greenhouse config:
-
-```yaml
-sources:
-  sample:
-    enabled: false
-  local_file:
-    enabled: false
-    paths: []
-  greenhouse:
-    enabled: true
-    board_tokens:
-      - example-board-token
-    timeout_seconds: 20
-  lever:
-    enabled: false
-    companies: []
-    timeout_seconds: 20
-    base_url: https://api.lever.co/v0/postings
-  ashby:
-    enabled: false
-    organizations: []
-    timeout_seconds: 30
-    base_url: https://api.ashbyhq.com/posting-api/job-board
-  workday:
-    enabled: false
-    sites: []
-    timeout_seconds: 20
-    page_size: 20
-    max_jobs_per_site: 100
-```
-
-Example Lever config:
-
-```yaml
-sources:
-  sample:
-    enabled: false
-  local_file:
-    enabled: false
-    paths: []
-  greenhouse:
-    enabled: false
-    board_tokens: []
-    timeout_seconds: 20
-  lever:
-    enabled: true
-    companies:
-      - example-company
-    timeout_seconds: 20
-    base_url: https://api.lever.co/v0/postings
-  ashby:
-    enabled: false
-    organizations: []
-    timeout_seconds: 30
-    base_url: https://api.ashbyhq.com/posting-api/job-board
-  workday:
-    enabled: false
-    sites: []
-    timeout_seconds: 20
-    page_size: 20
-    max_jobs_per_site: 100
-```
-
-Example Ashby config:
-
-```yaml
-sources:
-  sample:
-    enabled: false
-  local_file:
-    enabled: false
-    paths: []
-  greenhouse:
-    enabled: false
-    board_tokens: []
-    timeout_seconds: 20
-  lever:
-    enabled: false
-    companies: []
-    timeout_seconds: 20
-    base_url: https://api.lever.co/v0/postings
-  ashby:
-    enabled: true
-    organizations:
-      - example-organization
-    timeout_seconds: 30
-    base_url: https://api.ashbyhq.com/posting-api/job-board
-  workday:
-    enabled: false
-    sites: []
-    timeout_seconds: 20
-    page_size: 20
-    max_jobs_per_site: 100
-```
-
-Example Workday config:
-
-```yaml
-sources:
-  sample:
-    enabled: false
-  local_file:
-    enabled: false
-    paths: []
-  greenhouse:
-    enabled: false
-    board_tokens: []
-    timeout_seconds: 20
-  lever:
-    enabled: false
-    companies: []
-    timeout_seconds: 20
-    base_url: https://api.lever.co/v0/postings
-  ashby:
-    enabled: false
-    organizations: []
-    timeout_seconds: 30
-    base_url: https://api.ashbyhq.com/posting-api/job-board
-  workday:
-    enabled: true
-    sites:
-      - company: NVIDIA
-        url: https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite
-      - company: Equinix
-        url: https://equinix.wd1.myworkdayjobs.com/External
-      - company: Micron
-        url: https://micron.wd1.myworkdayjobs.com/External
-    timeout_seconds: 20
-    page_size: 20
-    max_jobs_per_site: 100
-```
-
-## Manual Runs
-
-Create the default config and run from any directory:
-
-```bash
-labor-sieve quickstart
-# edit ~/labor-sieve/config.yaml with your preferred text editor
-labor-sieve validate-config
-labor-sieve run
-less ~/labor-sieve/output/latest.txt
-```
-
-The config file for this setup is `~/labor-sieve/config.yaml`. Default reports are written under `~/labor-sieve/output/`.
-
-Review the enabled source lists before scheduled use. Broad sources are under `sources.remoteok` and `sources.arbeitnow`. Workday entries are under `sources.workday.sites`; Greenhouse, Lever, and Ashby entries are under their matching source sections.
-
-Subsequent runs:
-
-```bash
-labor-sieve run
-```
-
-`labor-sieve run` uses `./config.yaml` if one exists, otherwise `~/labor-sieve/config.yaml`. While sources are fetching, it prints simple progress with elapsed time.
-
-Update the installed command from PyPI:
-
-```bash
-pipx upgrade labor-sieve
-```
-
-## Uninstall
-
-`pipx uninstall labor-sieve` removes the installed command, but it does not remove `~/labor-sieve/config.yaml` or generated reports.
-
-To remove user data and then uninstall:
-
-```bash
-labor-sieve uninstall-data --yes
-pipx uninstall labor-sieve
 ```
 
 ## Scheduled Runs
@@ -551,21 +398,13 @@ systemctl --user list-timers labor-sieve.timer
 systemctl --user start labor-sieve.service
 ```
 
-Enable lingering for scheduled user timers on systems that support it:
+On systems that support lingering, this allows user timers to run while the user is logged out:
 
 ```bash
 loginctl enable-linger "$USER"
 ```
 
-## Distribution
-
-Public installs use the PyPI package through `pipx`. On Debian and Ubuntu systems, plain `pip install --user labor-sieve` can be blocked by the system Python package policy; `pipx` creates an isolated application environment and exposes the `labor-sieve` command.
-
-Install from PyPI:
-
-```bash
-pipx install labor-sieve
-```
+## Upgrade And Uninstall
 
 Upgrade from PyPI:
 
@@ -573,26 +412,39 @@ Upgrade from PyPI:
 pipx upgrade labor-sieve
 ```
 
-The local installer script is for maintainer testing from an accessible checkout or local wheel:
+Remove generated user data and then uninstall:
 
 ```bash
-scripts/install.sh dist/labor_sieve-VERSION-py3-none-any.whl
+labor-sieve uninstall-data --yes
+pipx uninstall labor-sieve
 ```
 
-Installer environment variables:
+`pipx uninstall labor-sieve` removes the installed command. It does not remove `~/labor-sieve/config.yaml` or generated reports unless `labor-sieve uninstall-data --yes` is run first.
 
-```bash
-LABOR_SIEVE_INSTALL_MODE=venv     # force the dedicated venv path
-LABOR_SIEVE_INSTALL_ROOT=...      # override ~/.local/share/labor-sieve
-LABOR_SIEVE_BIN_DIR=...           # override ~/.local/bin
-```
+## Developer Install
 
-Build release artifacts:
+From a checkout:
 
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install -e ".[dev]"
+
+labor-sieve quickstart -c config.yaml
+labor-sieve validate-config -c config.yaml
+labor-sieve run -c config.yaml
+```
+
+Run tests:
+
+```bash
+python -m compileall labor_sieve tests
+python -m pytest
+```
+
+Build release artifacts:
+
+```bash
 scripts/build-release.sh
 python -m twine check dist/*
 ```
@@ -609,18 +461,4 @@ Bundled preset changes ship in the PyPI package. A remote preset index requires 
 
 ```bash
 python3 scripts/build-preset-index.py --base-url https://example.com/labor-sieve/presets
-```
-
-## Local Testing
-
-```bash
-python -m compileall .
-python -m pytest
-```
-
-Install dev dependencies:
-
-```bash
-python -m pip install -e ".[dev]"
-python -m pytest
 ```
