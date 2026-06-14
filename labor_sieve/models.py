@@ -30,3 +30,6 @@ class ScoredJob:
     score: int
     priority: str
     reasons: list[str] = field(default_factory=list)
+    history_status: str = ""
+    previous_score: int | None = None
+    score_delta: int | None = None

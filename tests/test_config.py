@@ -61,6 +61,8 @@ def test_example_config_is_valid():
     assert "United States" in config.locations.accepted_remote_locations
     assert config.output.terminal_p0_limit == 10
     assert config.output.terminal_p1_limit == 15
+    assert config.update_check.enabled is True
+    assert config.update_check.interval_days == 7
     assert config.sources.ashby.timeout_seconds == 30
     assert config.language_requirements.accepted == ["english"]
     assert config.language_requirements.boost == []
@@ -220,6 +222,17 @@ def test_validation_reports_invalid_language_requirement_points():
 
     assert "language_requirements.penalty must be a non-negative integer." in errors
     assert "language_requirements.boost_points must be a non-negative integer." in errors
+
+
+def test_validation_reports_invalid_update_check_settings():
+    data = load_example()
+    data["update_check"]["enabled"] = "yes"
+    data["update_check"]["interval_days"] = 0
+
+    errors = validate_config_data(data)
+
+    assert "update_check.enabled must be true or false." in errors
+    assert "update_check.interval_days must be an integer from 1 to 365." in errors
 
 
 def test_validation_requires_https_for_lever_base_url():

@@ -84,17 +84,21 @@ def score_jobs(jobs: list[Job], config: Config) -> list[ScoredJob]:
 def score_job(job: Job, config: Config) -> ScoredJob:
     score = 10.0
     score_cap = 100.0
-    reasons: list[str] = ["base score 10"]
+    reasons: list[str] = ["base score +10"]
 
     role_weight = config.role_family_weights.get(
         job.role_family,
         config.role_family_weights.get("unknown", 0.0),
     )
-    score += role_weight * 35
+    role_points = role_weight * 35
+    score += role_points
     if job.role_family in config.role_family_weights:
-        reasons.append(f"role family {job.role_family} weight {role_weight:.2f}")
+        reasons.append(f"role family {job.role_family} weight {role_weight:.2f} +{role_points:.1f}")
     else:
-        reasons.append(f"role family {job.role_family} not configured; used unknown weight {role_weight:.2f}")
+        reasons.append(
+            f"role family {job.role_family} not configured; used unknown weight {role_weight:.2f} "
+            f"+{role_points:.1f}"
+        )
 
     score += _seniority_points(job, config, reasons)
     location_points, location_cap = _location_points_and_cap(job, config, reasons)
@@ -129,7 +133,7 @@ def score_job(job: Job, config: Config) -> ScoredJob:
         reasons.append("executive roles are capped because allow_executive is false")
 
     if score > score_cap:
-        reasons.append(f"score capped at {round(score_cap)} by scope limits")
+        reasons.append(f"score capped at {round(score_cap)} by scope limits before final score")
 
     final_score = max(0, min(100, round(min(score, score_cap))))
     return ScoredJob(

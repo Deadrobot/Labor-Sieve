@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
+from datetime import date
 import shlex
 import shutil
 import sys
@@ -10,13 +12,25 @@ import threading
 import time
 from pathlib import Path
 from typing import TextIO
+from urllib.request import Request
 
 from . import __version__
+from .company_catalog import (
+    KNOWN_SOURCE_FIELDS,
+    add_catalog_entries_to_config_data,
+    company_catalog_entry_is_stale,
+    enable_catalog_entries_in_config,
+    filter_company_catalog,
+    format_company_entry,
+    load_company_catalog,
+)
+from .completions import SOURCES as COMPLETION_SOURCES, render_completion
 from .config import (
     Config,
     ConfigError,
     ConfigUpgradeResult,
     MAX_TIMEOUT_SECONDS,
+    WorkdaySiteConfig,
     built_in_options_text,
     find_config_example,
     init_config,
@@ -26,9 +40,12 @@ from .config import (
     validate_config_data,
     yaml,
 )
+from .history import annotate_run_history, history_enabled, load_history, save_history
+from .update_check import maybe_print_update_notice
 from .models import Job
 from .dedupe import dedupe_jobs
 from .exclusions import apply_exclusions
+from .net import open_without_redirects
 from .presets import (
     PresetError,
     apply_preset_to_config,
@@ -37,6 +54,7 @@ from .presets import (
     update_presets,
 )
 from .reports import render_terminal_summary, write_reports
+from .schema import render_config_schema
 from .scoring import score_jobs
 from .sources.ashby import AshbySource
 from .sources.arbeitnow import ArbeitnowSource
@@ -47,6 +65,10 @@ from .sources.lever import LeverSource
 from .sources.remoteok import RemoteOkSource
 from .sources.sample import SampleSource
 from .sources.workday import WorkdaySite, WorkdaySource
+
+
+RUN_SOURCE_CHOICES = tuple(COMPLETION_SOURCES)
+CATALOG_STALE_DAYS = 180
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -96,6 +118,16 @@ def build_parser() -> argparse.ArgumentParser:
         parents=[config_parent],
         help="Check installation and config health",
     )
+    doctor_parser.add_argument(
+        "--catalog",
+        action="store_true",
+        help="Also check packaged company catalog freshness",
+    )
+    doctor_parser.add_argument(
+        "--network",
+        action="store_true",
+        help="Also check live network reachability for configured sources",
+    )
     doctor_parser.set_defaults(func=cmd_doctor)
 
     validate_parser = subparsers.add_parser(
@@ -113,6 +145,22 @@ def build_parser() -> argparse.ArgumentParser:
     config_upgrade_parser.set_defaults(func=cmd_config_upgrade)
 
     run_parser = subparsers.add_parser("run", parents=[config_parent], help="Run enabled sources and write reports")
+    run_parser.add_argument(
+        "--source",
+        choices=RUN_SOURCE_CHOICES,
+        action="append",
+        help="Only run this source. Repeat to allow multiple sources.",
+    )
+    run_parser.add_argument(
+        "--company",
+        action="append",
+        help="Only run catalog targets for this company key. Repeat to run multiple companies.",
+    )
+    run_parser.add_argument(
+        "--no-history",
+        action="store_true",
+        help="Do not read or update run history for this run.",
+    )
     run_parser.set_defaults(func=cmd_run)
 
     uninstall_data_parser = subparsers.add_parser(
@@ -128,6 +176,45 @@ def build_parser() -> argparse.ArgumentParser:
 
     list_parser = subparsers.add_parser("list-options", help="List supported taxonomy options")
     list_parser.set_defaults(func=cmd_list_options)
+
+    list_companies_parser = subparsers.add_parser(
+        "list-companies",
+        help="List packaged company targets for ATS sources",
+    )
+    list_companies_parser.add_argument(
+        "--source",
+        choices=sorted(KNOWN_SOURCE_FIELDS),
+        help="Only show companies with a target for this source",
+    )
+    list_companies_parser.add_argument("--tag", help="Only show companies with this tag")
+    list_companies_parser.add_argument("--search", help="Search company names, IDs, tags, and target values")
+    list_companies_parser.add_argument(
+        "--stale",
+        action="store_true",
+        help=f"Only show companies not verified in the last {CATALOG_STALE_DAYS} days",
+    )
+    list_companies_parser.set_defaults(func=cmd_list_companies)
+
+    enable_company_parser = subparsers.add_parser(
+        "enable-company",
+        parents=[config_parent],
+        help="Add packaged company targets to config.yaml",
+    )
+    enable_company_parser.add_argument("company", nargs="*", help="Catalog company key to enable")
+    enable_company_parser.add_argument("--tag", help="Enable all catalog companies with this tag")
+    enable_company_parser.add_argument(
+        "--source",
+        choices=sorted(KNOWN_SOURCE_FIELDS),
+        help="Only enable targets for this source",
+    )
+    enable_company_parser.set_defaults(func=cmd_enable_company)
+
+    schema_parser = subparsers.add_parser("schema", help="Print JSON Schema for config.yaml")
+    schema_parser.set_defaults(func=cmd_schema)
+
+    completions_parser = subparsers.add_parser("completions", help="Print shell completion script")
+    completions_parser.add_argument("shell", choices=["bash", "zsh", "fish"])
+    completions_parser.set_defaults(func=cmd_completions)
 
     preset_parent = argparse.ArgumentParser(add_help=False)
     preset_parent.add_argument(
@@ -199,12 +286,14 @@ def cmd_quickstart(args: argparse.Namespace) -> int:
         if not upgrade_config_if_needed(config_path, stream=sys.stdout):
             return 1
         print(quickstart_text(config_path, include_create=True))
+    maybe_check_for_updates(config_path, stream=sys.stderr)
     return 0
 
 
 def cmd_doctor(args: argparse.Namespace) -> int:
     checks: list[tuple[str, bool, str]] = []
     config_path = resolve_config_path(args.config)
+    loaded_config: Config | None = None
 
     checks.append(
         (
@@ -251,19 +340,26 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
     if config_ok and config_data is not None:
         try:
-            config = load_config(config_path)
-            enabled = [source.name for source in enabled_sources(config)]
+            loaded_config = load_config(config_path)
+            enabled = [source.name for source in enabled_sources(loaded_config)]
             checks.append(("Enabled sources", bool(enabled), ", ".join(enabled) if enabled else "none enabled"))
-            output_dir = resolve_output_dir(config, config_path)
+            output_dir = resolve_output_dir(loaded_config, config_path)
             parent = output_dir.parent if output_dir.parent != Path("") else Path(".")
             checks.append(("Output parent", parent.exists(), str(parent)))
         except ConfigError as exc:
             checks.append(("Parsed config", False, "; ".join(exc.errors)))
 
+    if args.catalog:
+        checks.extend(catalog_doctor_checks())
+    if args.network:
+        checks.extend(network_doctor_checks(loaded_config))
+
     print(f"LaborSieve {__version__} doctor")
     for label, passed, detail in checks:
         status = "ok" if passed else "fail"
         print(f"[{status}] {label}: {detail}")
+    if loaded_config is not None:
+        maybe_print_configured_update_notice(loaded_config, stream=sys.stderr)
     return 0 if all(passed for _, passed, _ in checks) else 1
 
 
@@ -331,15 +427,91 @@ def cmd_list_options(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_list_companies(args: argparse.Namespace) -> int:
+    try:
+        entries = load_company_catalog()
+    except ConfigError as exc:
+        print_errors(exc.errors)
+        return 1
+
+    entries = filter_company_catalog(
+        entries,
+        source=args.source,
+        tag=args.tag,
+        search=args.search,
+        stale_days=CATALOG_STALE_DAYS if args.stale else None,
+    )
+    if not entries:
+        print("No companies matched.")
+        return 0
+
+    print("Available companies:")
+    for entry in entries:
+        for line in format_company_entry(entry).splitlines():
+            print(f"  {line}")
+    return 0
+
+
+def cmd_enable_company(args: argparse.Namespace) -> int:
+    config_path = resolve_config_path(args.config)
+    if not upgrade_config_if_needed(config_path, stream=sys.stdout):
+        return 1
+    try:
+        entries = selected_catalog_entries(
+            company_keys=args.company,
+            tag=args.tag,
+            source=args.source,
+        )
+        if not entries:
+            print("No companies matched.")
+            return 1
+        path, backup_path, changed = enable_catalog_entries_in_config(
+            entries,
+            config_path,
+            source=args.source,
+        )
+    except ConfigError as exc:
+        print_errors(exc.errors)
+        return 1
+
+    if not changed:
+        print(f"No config changes needed: {path}")
+        return 0
+    print(f"Config updated: {path}")
+    if backup_path is not None:
+        print(f"Backup written to {backup_path}")
+    print("Enabled company targets:")
+    for item in changed:
+        print(f"  - {item}")
+    return 0
+
+
+def cmd_schema(args: argparse.Namespace) -> int:
+    del args
+    print(render_config_schema(), end="")
+    return 0
+
+
+def cmd_completions(args: argparse.Namespace) -> int:
+    try:
+        print(render_completion(args.shell), end="")
+    except ValueError as exc:
+        print_errors([str(exc)])
+        return 1
+    return 0
+
+
 def cmd_run(args: argparse.Namespace) -> int:
     config_path = resolve_config_path(args.config)
     if not upgrade_config_if_needed(config_path, stream=sys.stderr):
         return 1
     try:
         config = load_config(config_path)
+        config = filtered_run_config(config, source_filters=args.source, company_keys=args.company)
     except ConfigError as exc:
         print_errors(exc.errors)
         return 1
+    maybe_print_configured_update_notice(config, stream=sys.stderr)
 
     jobs, source_errors = fetch_jobs(config)
     if source_errors:
@@ -352,11 +524,17 @@ def cmd_run(args: argparse.Namespace) -> int:
     jobs, excluded_count = apply_exclusions(jobs, config)
     jobs, duplicate_count = dedupe_jobs(jobs)
     scored = score_jobs(jobs, config)
+    history = None
+    if history_enabled() and not args.no_history:
+        previous = load_history()
+        history = annotate_run_history(scored, previous)
     try:
-        written = write_reports(scored, config, base_dir=_absolute_path(config_path).parent)
+        written = write_reports(scored, config, base_dir=_absolute_path(config_path).parent, history=history)
     except OSError as exc:
         print_errors([f"Reports could not be written: {exc}"])
         return 1
+    if history_enabled() and not args.no_history:
+        save_history(scored)
     print(
         render_terminal_summary(
             scored,
@@ -364,6 +542,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             config=config,
             duplicate_count=duplicate_count,
             excluded_count=excluded_count,
+            history=history,
         )
     )
     return 0
@@ -441,6 +620,176 @@ def fetch_jobs(config: Config) -> tuple[list[Job], list[str]]:
         except SourceError as exc:
             errors.append(f"{source.name}: {exc}")
     return jobs, errors
+
+
+def selected_catalog_entries(
+    *,
+    company_keys: list[str],
+    tag: str | None,
+    source: str | None,
+) -> list:
+    if not company_keys and not tag:
+        raise ConfigError(["Provide at least one company key or --tag."])
+    entries = load_company_catalog()
+    selected = []
+    by_key = {entry.key: entry for entry in entries}
+    for key in company_keys:
+        normalized = key.casefold()
+        entry = by_key.get(normalized)
+        if entry is None:
+            raise ConfigError([f"Company {key!r} was not found. Run: labor-sieve list-companies --search {key}"])
+        selected.append(entry)
+    if tag:
+        selected.extend(filter_company_catalog(entries, tag=tag))
+    deduped = []
+    seen = set()
+    for entry in selected:
+        if source and source not in entry.sources:
+            continue
+        if entry.key not in seen:
+            seen.add(entry.key)
+            deduped.append(entry)
+    return deduped
+
+
+def filtered_run_config(
+    config: Config,
+    *,
+    source_filters: list[str] | None,
+    company_keys: list[str] | None,
+) -> Config:
+    filtered = deepcopy(config)
+    allowed_sources = set(source_filters or [])
+    if company_keys:
+        unsupported = sorted(allowed_sources - set(KNOWN_SOURCE_FIELDS))
+        if unsupported:
+            raise ConfigError(
+                [
+                    "--company can only be combined with catalog-backed sources: "
+                    + ", ".join(sorted(KNOWN_SOURCE_FIELDS))
+                    + f" (got {', '.join(unsupported)})."
+                ]
+            )
+        entries = selected_catalog_entries(company_keys=company_keys, tag=None, source=None)
+        filter_config_to_catalog_entries(filtered, entries, allowed_sources=allowed_sources)
+        if not config_has_enabled_source(filtered):
+            raise ConfigError(["No catalog targets matched the selected company/source filters."])
+        return filtered
+    if allowed_sources:
+        disable_unselected_sources(filtered, allowed_sources)
+    return filtered
+
+
+def disable_unselected_sources(config: Config, allowed_sources: set[str]) -> None:
+    for name in RUN_SOURCE_CHOICES:
+        source_config = getattr(config.sources, name)
+        source_config.enabled = name in allowed_sources
+
+
+def config_has_enabled_source(config: Config) -> bool:
+    return any(getattr(config.sources, name).enabled for name in RUN_SOURCE_CHOICES)
+
+
+def filter_config_to_catalog_entries(config: Config, entries: list, *, allowed_sources: set[str]) -> None:
+    selected_sources = set(allowed_sources)
+    if not selected_sources:
+        selected_sources = {source for entry in entries for source in entry.sources}
+    disable_unselected_sources(config, selected_sources)
+    config.sources.greenhouse.board_tokens = []
+    config.sources.lever.companies = []
+    config.sources.ashby.organizations = []
+    config.sources.workday.sites = []
+
+    data = {
+        "sources": {
+            "greenhouse": {"enabled": config.sources.greenhouse.enabled, "board_tokens": []},
+            "lever": {"enabled": config.sources.lever.enabled, "companies": []},
+            "ashby": {"enabled": config.sources.ashby.enabled, "organizations": []},
+            "workday": {"enabled": config.sources.workday.enabled, "sites": []},
+        }
+    }
+    add_catalog_entries_to_config_data(data, entries, source=None)
+    sources = data["sources"]
+    config.sources.greenhouse.board_tokens = sources["greenhouse"]["board_tokens"]
+    config.sources.greenhouse.enabled = "greenhouse" in selected_sources and bool(config.sources.greenhouse.board_tokens)
+    config.sources.lever.companies = sources["lever"]["companies"]
+    config.sources.lever.enabled = "lever" in selected_sources and bool(config.sources.lever.companies)
+    config.sources.ashby.organizations = sources["ashby"]["organizations"]
+    config.sources.ashby.enabled = "ashby" in selected_sources and bool(config.sources.ashby.organizations)
+    config.sources.workday.sites = [
+        WorkdaySiteConfig(company=site["company"], url=site["url"]) for site in sources["workday"]["sites"]
+    ]
+    config.sources.workday.enabled = "workday" in selected_sources and bool(config.sources.workday.sites)
+
+
+def catalog_doctor_checks() -> list[tuple[str, bool, str]]:
+    try:
+        entries = load_company_catalog()
+    except ConfigError as exc:
+        return [("Company catalog", False, "; ".join(exc.errors))]
+    stale = [
+        entry
+        for entry in entries
+        if company_catalog_entry_is_stale(entry, CATALOG_STALE_DAYS, date.today())
+    ]
+    source_counts = {
+        source: sum(1 for entry in entries if source in entry.sources)
+        for source in sorted(KNOWN_SOURCE_FIELDS)
+    }
+    detail = ", ".join(f"{source} {count}" for source, count in source_counts.items())
+    checks = [("Company catalog", bool(entries), f"{len(entries)} companies; {detail}")]
+    checks.append(
+        (
+            "Catalog verification freshness",
+            not stale,
+            "all current" if not stale else f"{len(stale)} stale entries",
+        )
+    )
+    return checks
+
+
+def network_doctor_checks(config: Config | None) -> list[tuple[str, bool, str]]:
+    checks = [network_probe_url("PyPI", "https://pypi.org/pypi/labor-sieve/json")]
+    if config is None:
+        checks.append(("Configured source network", False, "config was not loaded"))
+        return checks
+    if config.sources.remoteok.enabled:
+        checks.append(network_probe_url("RemoteOK", config.sources.remoteok.base_url))
+    if config.sources.arbeitnow.enabled:
+        checks.append(network_probe_url("Arbeitnow", config.sources.arbeitnow.base_url))
+    if config.sources.greenhouse.enabled:
+        for token in config.sources.greenhouse.board_tokens:
+            checks.append(
+                network_probe_url(
+                    f"Greenhouse {token}",
+                    f"https://boards-api.greenhouse.io/v1/boards/{token}/jobs?content=false",
+                )
+            )
+    if config.sources.lever.enabled:
+        for company in config.sources.lever.companies:
+            checks.append(network_probe_url(f"Lever {company}", f"{config.sources.lever.base_url.rstrip('/')}/{company}?mode=json"))
+    if config.sources.ashby.enabled:
+        for organization in config.sources.ashby.organizations:
+            checks.append(
+                network_probe_url(
+                    f"Ashby {organization}",
+                    f"{config.sources.ashby.base_url.rstrip('/')}/{organization}?includeCompensation=true",
+                )
+            )
+    if config.sources.workday.enabled:
+        for site in config.sources.workday.sites:
+            checks.append(network_probe_url(f"Workday {site.company}", site.url))
+    return checks
+
+
+def network_probe_url(label: str, url: str, timeout_seconds: int = 5) -> tuple[str, bool, str]:
+    request = Request(url, headers={"User-Agent": "labor-sieve doctor"})
+    try:
+        with open_without_redirects(request, timeout_seconds) as response:
+            status = getattr(response, "status", 200)
+            return (label, 200 <= int(status) < 400, f"HTTP {status}")
+    except Exception as exc:
+        return (label, False, str(exc))
 
 
 def enabled_sources(config: Config) -> list[JobSource]:
@@ -556,6 +905,23 @@ def upgrade_config_if_needed(path: Path, *, stream: TextIO) -> bool:
     if result.changed:
         print(format_config_upgrade_result(result), file=stream)
     return True
+
+
+def maybe_check_for_updates(config_path: Path, *, stream: TextIO) -> None:
+    try:
+        config = load_config(config_path)
+    except ConfigError:
+        return
+    maybe_print_configured_update_notice(config, stream=stream)
+
+
+def maybe_print_configured_update_notice(config: Config, *, stream: TextIO) -> None:
+    maybe_print_update_notice(
+        installed_version=__version__,
+        enabled=config.update_check.enabled,
+        interval_days=config.update_check.interval_days,
+        stream=stream,
+    )
 
 
 def format_config_upgrade_result(result: ConfigUpgradeResult) -> str:
@@ -681,7 +1047,10 @@ def quickstart_text(config_path: Path, *, include_create: bool) -> str:
             "Useful setup commands:",
             "  labor-sieve list-presets",
             f"  {preset_command}",
+            "  labor-sieve list-companies --source greenhouse",
+            "  labor-sieve enable-company coreweave",
             "  labor-sieve list-options",
+            "  labor-sieve schema",
             "",
             "Scheduled run example:",
             (

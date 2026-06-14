@@ -38,6 +38,7 @@ HTML_REPORT_STYLE = """
       .score-pill { background: #17202a; color: #fff; }
       .state-badges { display: inline-flex; flex-wrap: wrap; gap: 0.35rem; justify-content: flex-end; }
       .state-badge { background: #dbeafe; color: #0f376f; }
+      .state-badge.history { background: #dcfce7; color: #14532d; }
       .state-badge.rejected, .state-badge.hidden { background: #fee2e2; color: #8a1f1f; }
       .state-badge[hidden] { display: none; }
       .job-body { padding-top: 0.75rem; }
@@ -164,7 +165,13 @@ HTML_REPORT_SCRIPT = """
 """
 
 
-def write_reports(scored_jobs: list[ScoredJob], config: Config, *, base_dir: Path | None = None) -> dict[str, Path]:
+def write_reports(
+    scored_jobs: list[ScoredJob],
+    config: Config,
+    *,
+    base_dir: Path | None = None,
+    history: object | None = None,
+) -> dict[str, Path]:
     output_dir = Path(config.output.directory).expanduser()
     if base_dir is not None and not output_dir.is_absolute():
         output_dir = base_dir / output_dir
@@ -173,7 +180,7 @@ def write_reports(scored_jobs: list[ScoredJob], config: Config, *, base_dir: Pat
     written: dict[str, Path] = {}
     if config.output.txt:
         path = output_dir / "latest.txt"
-        path.write_text(render_text_report(scored_jobs), encoding="utf-8")
+        path.write_text(render_text_report(scored_jobs, history=history), encoding="utf-8")
         written["txt"] = path
     if config.output.csv:
         path = output_dir / "latest.csv"
@@ -181,11 +188,11 @@ def write_reports(scored_jobs: list[ScoredJob], config: Config, *, base_dir: Pat
         written["csv"] = path
     if config.output.json:
         path = output_dir / "latest.json"
-        path.write_text(render_json_report(scored_jobs), encoding="utf-8")
+        path.write_text(render_json_report(scored_jobs, history=history), encoding="utf-8")
         written["json"] = path
     if config.output.html:
         path = output_dir / "latest.html"
-        path.write_text(render_html_report(scored_jobs), encoding="utf-8")
+        path.write_text(render_html_report(scored_jobs, history=history), encoding="utf-8")
         written["html"] = path
     return written
 
@@ -196,6 +203,7 @@ def render_terminal_summary(
     duplicate_count: int = 0,
     excluded_count: int = 0,
     config: Config | None = None,
+    history: object | None = None,
 ) -> str:
     counts = bucket_counts(scored_jobs)
     lines = [
@@ -205,6 +213,18 @@ def render_terminal_summary(
         "Buckets: " + " | ".join(f"{bucket} {counts[bucket]}" for bucket in PRIORITY_BUCKETS),
         "",
     ]
+    if history is not None:
+        lines.extend(
+            [
+                (
+                    "History: "
+                    f"{getattr(history, 'new_count', 0)} new | "
+                    f"{getattr(history, 'seen_count', 0)} seen | "
+                    f"{_history_disappeared_count(history)} disappeared"
+                ),
+                "",
+            ]
+        )
 
     terminal_p0_limit = config.output.terminal_p0_limit if config is not None else 10
     terminal_p1_limit = config.output.terminal_p1_limit if config is not None else 15
@@ -223,6 +243,8 @@ def render_terminal_summary(
                 [
                     f"{item.priority} {item.score}: {job.title} at {job.company}",
                     f"  {location} | {job.seniority} | {job.role_family} | {comp} | {job.source}",
+                    f"  {terminal_history_text(item)}",
+                    f"  Why: {terminal_reason_text(item)}",
                     f"  {job.url}",
                 ]
             )
@@ -282,7 +304,7 @@ def terminal_location(location: str, remote: bool) -> str:
     return "Remote" if remote else location
 
 
-def render_text_report(scored_jobs: list[ScoredJob]) -> str:
+def render_text_report(scored_jobs: list[ScoredJob], *, history: object | None = None) -> str:
     generated = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     counts = bucket_counts(scored_jobs)
     lines = [
@@ -292,6 +314,18 @@ def render_text_report(scored_jobs: list[ScoredJob]) -> str:
         "Buckets: " + " | ".join(f"{bucket} {counts[bucket]}" for bucket in PRIORITY_BUCKETS),
         "",
     ]
+    if history is not None:
+        lines.extend(
+            [
+                (
+                    "History: "
+                    f"{getattr(history, 'new_count', 0)} new | "
+                    f"{getattr(history, 'seen_count', 0)} seen | "
+                    f"{_history_disappeared_count(history)} disappeared"
+                ),
+                "",
+            ]
+        )
 
     for bucket in PRIORITY_BUCKETS:
         bucket_jobs = [item for item in scored_jobs if item.priority == bucket]
@@ -308,6 +342,7 @@ def render_text_report(scored_jobs: list[ScoredJob]) -> str:
                     f"  Company: {job.company}",
                     f"  Score: {item.score}",
                     f"  Priority: {item.priority}",
+                    f"  History: {history_text(item)}",
                     f"  Seniority: {job.seniority}",
                     f"  Role family: {job.role_family}",
                     f"  Location: {job.location}",
@@ -325,6 +360,21 @@ def render_text_report(scored_jobs: list[ScoredJob]) -> str:
             for reason in item.reasons:
                 lines.append(f"    - {reason}")
             lines.append("")
+    disappeared = _history_disappeared(history)
+    if disappeared:
+        lines.append("## Disappeared since last run")
+        for record in disappeared:
+            lines.extend(
+                [
+                    f"{getattr(record, 'title', '')}",
+                    f"  Company: {getattr(record, 'company', '')}",
+                    f"  Previous score: {getattr(record, 'score', '')}",
+                    f"  Previous priority: {getattr(record, 'priority', '')}",
+                    f"  Source: {getattr(record, 'source', '')}",
+                    f"  URL: {getattr(record, 'url', '') or 'not listed'}",
+                    "",
+                ]
+            )
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -346,6 +396,9 @@ def write_csv_report(scored_jobs: list[ScoredJob], path: Path) -> None:
                 "url",
                 "tags",
                 "reasons",
+                "history_status",
+                "previous_score",
+                "score_delta",
                 "source",
                 "source_id",
                 "merged_sources",
@@ -369,6 +422,9 @@ def write_csv_report(scored_jobs: list[ScoredJob], path: Path) -> None:
                     "url": csv_safe_cell(job.url),
                     "tags": csv_safe_cell("; ".join(job.tags)),
                     "reasons": csv_safe_cell("; ".join(item.reasons)),
+                    "history_status": csv_safe_cell(item.history_status),
+                    "previous_score": "" if item.previous_score is None else item.previous_score,
+                    "score_delta": "" if item.score_delta is None else item.score_delta,
                     "source": csv_safe_cell(job.source),
                     "source_id": csv_safe_cell(job.source_id),
                     "merged_sources": csv_safe_cell("; ".join(job.merged_sources)),
@@ -387,17 +443,25 @@ def csv_safe_cell(value: str) -> str:
     return value
 
 
-def render_json_report(scored_jobs: list[ScoredJob]) -> str:
+def render_json_report(scored_jobs: list[ScoredJob], *, history: object | None = None) -> str:
     payload = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "count": len(scored_jobs),
         "buckets": bucket_counts(scored_jobs),
         "jobs": [scored_job_to_dict(item) for item in scored_jobs],
     }
+    if history is not None:
+        payload["history"] = {
+            "previous_count": getattr(history, "previous_count", 0),
+            "new_count": getattr(history, "new_count", 0),
+            "seen_count": getattr(history, "seen_count", 0),
+            "disappeared_count": _history_disappeared_count(history),
+            "disappeared": [_history_record_to_dict(record) for record in _history_disappeared(history)],
+        }
     return json.dumps(payload, indent=2) + "\n"
 
 
-def render_html_report(scored_jobs: list[ScoredJob]) -> str:
+def render_html_report(scored_jobs: list[ScoredJob], *, history: object | None = None) -> str:
     counts = bucket_counts(scored_jobs)
     sections = []
     for bucket in PRIORITY_BUCKETS:
@@ -407,6 +471,11 @@ def render_html_report(scored_jobs: list[ScoredJob]) -> str:
             job_key = html.escape(report_job_key(item), quote=True)
             reasons = "".join(f"<li>{html.escape(reason)}</li>" for reason in item.reasons)
             tags = html.escape(", ".join(job.tags) if job.tags else "none")
+            history_label = html.escape(history_text(item))
+            history_badge = html.escape(item.history_status.title()) if item.history_status else ""
+            history_badge_html = (
+                f'<span class="state-badge history">{history_badge}</span>' if history_badge else ""
+            )
             cards.append(
                 f"""
           <details class="job-card" data-job-key="{job_key}">
@@ -416,6 +485,7 @@ def render_html_report(scored_jobs: list[ScoredJob]) -> str:
                 <span>{html.escape(job.title)}</span>
               </span>
               <span class="state-badges" aria-label="Tracking state">
+                {history_badge_html}
                 <span class="state-badge" data-state-badge="interested" hidden>Interested</span>
                 <span class="state-badge" data-state-badge="applied" hidden>Applied</span>
                 <span class="state-badge rejected" data-state-badge="rejected" hidden>Rejected</span>
@@ -424,6 +494,7 @@ def render_html_report(scored_jobs: list[ScoredJob]) -> str:
             </summary>
             <div class="job-body">
               <p><strong>{html.escape(job.company)}</strong> | {html.escape(job.location)} | {html.escape(job.seniority)} | {html.escape(job.role_family)}</p>
+              <p>History: {history_label}</p>
               <p>Base compensation min: {html.escape(format_compensation(job.compensation_base_min))}</p>
               <p>Source: {html.escape(job.source)} | Merged sources: {html.escape(', '.join(job.merged_sources) if job.merged_sources else 'none')}</p>
               <p>{render_job_url(job.url)}</p>
@@ -450,6 +521,32 @@ def render_html_report(scored_jobs: list[ScoredJob]) -> str:
       </details>"""
         )
 
+    disappeared_section = ""
+    disappeared = _history_disappeared(history)
+    if disappeared:
+        items = "".join(
+            "<li>"
+            + html.escape(
+                f"{getattr(record, 'title', '')} at {getattr(record, 'company', '')} "
+                f"({getattr(record, 'priority', '')} {getattr(record, 'score', '')})"
+            )
+            + "</li>"
+            for record in disappeared
+        )
+        disappeared_section = f"""
+      <section class="bucket">
+        <h2>Disappeared since last run ({len(disappeared)})</h2>
+        <ul>{items}</ul>
+      </section>"""
+
+    history_summary = ""
+    if history is not None:
+        history_summary = (
+            f" History: {getattr(history, 'new_count', 0)} new | "
+            f"{getattr(history, 'seen_count', 0)} seen | "
+            f"{_history_disappeared_count(history)} disappeared."
+        )
+
     return f"""<!doctype html>
 <html lang="en">
   <head>
@@ -463,7 +560,7 @@ def render_html_report(scored_jobs: list[ScoredJob]) -> str:
   <body>
     <header>
       <h1>LaborSieve Report</h1>
-      <p>Scanned {len(scored_jobs)} jobs. {' | '.join(f'{bucket} {counts[bucket]}' for bucket in PRIORITY_BUCKETS)}</p>
+      <p>Scanned {len(scored_jobs)} jobs. {' | '.join(f'{bucket} {counts[bucket]}' for bucket in PRIORITY_BUCKETS)}.{html.escape(history_summary)}</p>
       <p class="tracking-note">Tracking buttons are stored in this browser.</p>
       <div class="report-controls">
         <button type="button" data-action="toggle-hidden" aria-pressed="false">Show rejected/hidden</button>
@@ -472,6 +569,7 @@ def render_html_report(scored_jobs: list[ScoredJob]) -> str:
     </header>
     <main>
       {''.join(sections)}
+      {disappeared_section}
     </main>
 {HTML_REPORT_SCRIPT}
   </body>
@@ -499,6 +597,9 @@ def scored_job_to_dict(item: ScoredJob) -> dict[str, object]:
         "source_id": job.source_id,
         "merged_sources": job.merged_sources,
         "reasons": item.reasons,
+        "history_status": item.history_status,
+        "previous_score": item.previous_score,
+        "score_delta": item.score_delta,
     }
 
 
@@ -512,6 +613,56 @@ def report_job_key(item: ScoredJob) -> str:
 def bucket_counts(scored_jobs: list[ScoredJob]) -> dict[str, int]:
     counts = Counter(item.priority for item in scored_jobs)
     return {bucket: counts.get(bucket, 0) for bucket in PRIORITY_BUCKETS}
+
+
+def history_text(item: ScoredJob) -> str:
+    if not item.history_status:
+        return "not tracked"
+    if item.history_status == "new":
+        return "new since last run"
+    if item.score_delta is None or item.previous_score is None:
+        return item.history_status
+    if item.score_delta == 0:
+        return f"seen before; score unchanged from {item.previous_score}"
+    sign = "+" if item.score_delta > 0 else ""
+    return f"seen before; score {sign}{item.score_delta} from {item.previous_score}"
+
+
+def terminal_history_text(item: ScoredJob) -> str:
+    return "History: " + history_text(item)
+
+
+def terminal_reason_text(item: ScoredJob) -> str:
+    if not item.reasons:
+        return "no score reasons listed"
+    return "; ".join(item.reasons[:3])
+
+
+def _history_disappeared(history: object | None) -> list[object]:
+    if history is None:
+        return []
+    disappeared = getattr(history, "disappeared", None)
+    if isinstance(disappeared, list):
+        return disappeared
+    return []
+
+
+def _history_disappeared_count(history: object | None) -> int:
+    return len(_history_disappeared(history))
+
+
+def _history_record_to_dict(record: object) -> dict[str, object]:
+    return {
+        "key": getattr(record, "key", ""),
+        "title": getattr(record, "title", ""),
+        "company": getattr(record, "company", ""),
+        "url": getattr(record, "url", ""),
+        "source": getattr(record, "source", ""),
+        "source_id": getattr(record, "source_id", ""),
+        "score": getattr(record, "score", 0),
+        "priority": getattr(record, "priority", ""),
+        "seen_at": getattr(record, "seen_at", ""),
+    }
 
 
 def yes_no(value: bool) -> str:

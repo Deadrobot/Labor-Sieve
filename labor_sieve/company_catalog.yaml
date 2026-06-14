@@ -1,0 +1,117 @@
+companies:
+  canonical:
+    name: Canonical
+    tags: [linux, infrastructure, platform_ops]
+    last_verified: 2026-06-14
+    notes: Default starter Greenhouse target.
+    sources:
+      greenhouse:
+        board_token: canonical
+
+  cloudflare:
+    name: Cloudflare
+    tags: [infrastructure, networking, reliability]
+    last_verified: 2026-06-14
+    notes: Default starter Greenhouse target.
+    sources:
+      greenhouse:
+        board_token: cloudflare
+
+  coreweave:
+    name: CoreWeave
+    tags: [data_center, infrastructure, cloud, gpu]
+    last_verified: 2026-06-14
+    notes: Default starter Greenhouse target.
+    sources:
+      greenhouse:
+        board_token: coreweave
+
+  crusoe:
+    name: Crusoe
+    tags: [data_center, infrastructure, energy]
+    last_verified: 2026-06-14
+    notes: Default starter Ashby target.
+    sources:
+      ashby:
+        organization: Crusoe
+
+  equinix:
+    name: Equinix
+    tags: [data_center, infrastructure, operations]
+    last_verified: 2026-06-14
+    notes: Default starter Workday target.
+    sources:
+      workday:
+        url: https://equinix.wd1.myworkdayjobs.com/External
+
+  lambda:
+    name: Lambda
+    tags: [gpu, infrastructure, ai_infra]
+    last_verified: 2026-06-14
+    notes: Default starter Ashby target.
+    sources:
+      ashby:
+        organization: Lambda
+
+  micron:
+    name: Micron
+    tags: [hardware, manufacturing, data_center]
+    last_verified: 2026-06-14
+    notes: Default starter Workday target.
+    sources:
+      workday:
+        url: https://micron.wd1.myworkdayjobs.com/External
+
+  modal:
+    name: Modal
+    tags: [cloud, infrastructure, ai_infra]
+    last_verified: 2026-06-14
+    notes: Default starter Ashby target.
+    sources:
+      ashby:
+        organization: Modal
+
+  nebius:
+    name: Nebius
+    tags: [cloud, infrastructure, ai_infra]
+    last_verified: 2026-06-14
+    notes: Default starter Greenhouse target.
+    sources:
+      greenhouse:
+        board_token: nebius
+
+  nvidia:
+    name: NVIDIA
+    tags: [hardware, data_center, infrastructure, gpu]
+    last_verified: 2026-06-14
+    notes: Default starter Workday target.
+    sources:
+      workday:
+        url: https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite
+
+  openai:
+    name: OpenAI
+    tags: [ai_infra, infrastructure, reliability]
+    last_verified: 2026-06-14
+    notes: Default starter Ashby target.
+    sources:
+      ashby:
+        organization: openai
+
+  samsara:
+    name: Samsara
+    tags: [infrastructure, fleet, operations]
+    last_verified: 2026-06-14
+    notes: Default starter Greenhouse target.
+    sources:
+      greenhouse:
+        board_token: samsara
+
+  waabi:
+    name: Waabi
+    tags: [autonomy, infrastructure, fleet]
+    last_verified: 2026-06-14
+    notes: Default starter Lever target.
+    sources:
+      lever:
+        company: waabi

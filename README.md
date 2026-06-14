@@ -87,6 +87,7 @@ Open `~/labor-sieve/config.yaml` and review:
 - `role_family_weights`: how strongly each role family should rank.
 - `exclusions`: companies, URLs, or source IDs to hide from future reports.
 - `sources`: enabled job sources and configured ATS company lists.
+- `update_check`: PyPI update-notice behavior.
 
 The default config is centered on Richmond, VA with a 40-mile local-region note. LaborSieve does not geocode. Local matching is controlled by the strings in `locations.accepted_locations`, so update that list when using a different city or metro area.
 
@@ -116,6 +117,8 @@ xdg-open ~/labor-sieve/output/latest.html
 
 The HTML report is local-only. It has collapsible priority buckets and job entries, plus browser-local tracking buttons for interested, applied, rejected, and hidden postings.
 
+Text, JSON, and HTML reports include score explanations for each job. When run history is enabled, reports also label jobs as new or previously seen and show score movement from the prior run.
+
 ## Commands
 
 ```bash
@@ -125,9 +128,13 @@ labor-sieve doctor
 labor-sieve validate-config
 labor-sieve config-upgrade
 labor-sieve list-options
+labor-sieve list-companies
+labor-sieve enable-company coreweave
 labor-sieve list-presets
 labor-sieve update-presets --index-url PRESET_INDEX_URL
 labor-sieve use-preset linux-sre
+labor-sieve schema
+labor-sieve completions bash
 labor-sieve run
 labor-sieve uninstall-data
 ```
@@ -142,9 +149,13 @@ labor-sieve uninstall-data
 
 `labor-sieve config-upgrade` backs up `config.yaml` and adds missing default settings from the installed package without changing existing values.
 
-`labor-sieve doctor` checks the Python runtime, PyYAML, bundled config/presets, and selected config file.
+`labor-sieve doctor` checks the Python runtime, PyYAML, bundled config/presets, and selected config file. Add `--catalog` for packaged company catalog freshness checks or `--network` for live reachability checks.
 
 `labor-sieve list-options` prints built-in seniority levels and role families.
+
+`labor-sieve list-companies` prints packaged company targets for Greenhouse, Lever, Ashby, and Workday. Use `--source`, `--tag`, `--search`, or `--stale` to narrow the list.
+
+`labor-sieve enable-company COMPANY` adds packaged company targets to `config.yaml`, enables the relevant ATS source, validates the result, and writes a `.bak` backup first. Use `--tag` to enable a tagged group such as `data_center`.
 
 `labor-sieve list-presets` prints bundled presets plus downloaded remote presets.
 
@@ -152,13 +163,25 @@ labor-sieve uninstall-data
 
 `labor-sieve use-preset PRESET` merges a preset into `config.yaml`, validates the result, and writes a `.bak` backup first.
 
-`labor-sieve run` adds missing default settings when needed, then uses enabled sources from the selected config file.
+`labor-sieve schema` prints JSON Schema for `config.yaml`. `labor-sieve completions bash`, `zsh`, or `fish` prints shell completion snippets.
+
+`labor-sieve run` adds missing default settings when needed, then uses enabled sources from the selected config file. Use `--source greenhouse` to run one source or `--company coreweave` to run catalog targets for one company without editing config.
 
 `labor-sieve uninstall-data` prints user data paths. `labor-sieve uninstall-data --yes` removes the default config/report directory, downloaded presets, and run logs.
 
 ## Configuration Notes
 
 User configs are preserved across package upgrades. When a newer LaborSieve release adds config settings, `quickstart`, `validate-config`, and `run` add missing defaults automatically and write a `.bak` backup first. Existing values are left unchanged.
+
+`quickstart`, `doctor`, and `run` also check PyPI for a newer LaborSieve release at most once every seven days by default. Failures are ignored. The state file is `~/.local/state/labor-sieve/update-check.json`.
+
+```yaml
+update_check:
+  enabled: true
+  interval_days: 7
+```
+
+`run` also tracks previous postings in `~/.local/state/labor-sieve/run-history.json`. Reports label new and previously seen jobs, show score changes, and list postings that disappeared since the prior run. Pass `labor-sieve run --no-history` for a one-off scan that does not read or update history.
 
 To upgrade config settings explicitly:
 
@@ -254,6 +277,20 @@ Available sources:
 The default config disables sample data, enables RemoteOK, disables Arbeitnow, and enables starter lists for Greenhouse, Lever, Ashby, and Workday.
 
 RemoteOK and Arbeitnow are broad sources. Greenhouse, Lever, Ashby, and Workday only scan the boards, companies, organizations, or sites listed in `config.yaml`.
+
+Use the packaged company catalog to find starter ATS targets:
+
+```bash
+labor-sieve list-companies
+labor-sieve list-companies --source greenhouse
+labor-sieve list-companies --tag data_center
+labor-sieve list-companies --search coreweave
+labor-sieve list-companies --stale
+labor-sieve enable-company coreweave
+labor-sieve enable-company --tag data_center
+```
+
+Catalog entries include tags, source-specific target values, verification dates, and notes. `labor-sieve doctor --catalog` checks whether packaged entries are stale.
 
 Example source entries:
 

@@ -23,6 +23,7 @@ MAX_TIMEOUT_SECONDS = 120
 MAX_LOCAL_FILE_PATHS = 100
 MAX_SOURCE_TARGETS = 100
 MAX_WORKDAY_SITES = 50
+MAX_UPDATE_INTERVAL_DAYS = 365
 
 REMOTEOK_BASE_URL = "https://remoteok.com/api"
 ARBEITNOW_BASE_URL = "https://www.arbeitnow.com/api/job-board-api"
@@ -178,6 +179,10 @@ output:
   terminal_p0_limit: 10
   terminal_p1_limit: 15
 
+update_check:
+  enabled: true
+  interval_days: 7
+
 sources:
   sample:
     enabled: false
@@ -306,6 +311,12 @@ class OutputConfig:
 
 
 @dataclass(slots=True)
+class UpdateCheckConfig:
+    enabled: bool
+    interval_days: int
+
+
+@dataclass(slots=True)
 class SampleSourceConfig:
     enabled: bool
 
@@ -393,6 +404,7 @@ class Config:
     compensation: CompensationConfig
     exclusions: ExclusionConfig
     output: OutputConfig
+    update_check: UpdateCheckConfig
     sources: SourceConfig
 
 
@@ -842,6 +854,18 @@ def validate_config_data(data: dict[str, Any]) -> list[str]:
             ):
                 errors.append(f"output.{key} must be a non-negative integer.")
 
+    update_check = _optional_mapping(data, "update_check", errors, label="update_check")
+    if update_check is not None:
+        _require_bool(update_check, "enabled", "update_check.enabled", errors)
+        _require_int_range(
+            update_check,
+            "interval_days",
+            "update_check.interval_days",
+            1,
+            MAX_UPDATE_INTERVAL_DAYS,
+            errors,
+        )
+
     sources = _require_mapping(data, "sources", errors)
     if sources is not None:
         sample = _require_mapping(sources, "sample", errors, label="sources.sample")
@@ -955,6 +979,7 @@ def config_from_data(data: dict[str, Any]) -> Config:
     compensation = data["compensation"]
     exclusions = data.get("exclusions", {})
     output = data["output"]
+    update_check = data.get("update_check", {})
     sources = data["sources"]
     sample = sources["sample"]
     local_file = sources.get("local_file", {})
@@ -1015,6 +1040,10 @@ def config_from_data(data: dict[str, Any]) -> Config:
             html=bool(output["html"]),
             terminal_p0_limit=int(output.get("terminal_p0_limit", 10)),
             terminal_p1_limit=int(output.get("terminal_p1_limit", 15)),
+        ),
+        update_check=UpdateCheckConfig(
+            enabled=bool(update_check.get("enabled", True)),
+            interval_days=int(update_check.get("interval_days", 7)),
         ),
         sources=SourceConfig(
             sample=SampleSourceConfig(enabled=bool(sample["enabled"])),

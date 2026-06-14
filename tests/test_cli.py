@@ -4,8 +4,8 @@ import pytest
 import yaml
 
 from labor_sieve import __version__
-from labor_sieve.cli import fetch_source_with_status, main
-from labor_sieve.config import MAX_TIMEOUT_SECONDS
+from labor_sieve.cli import fetch_source_with_status, filtered_run_config, main
+from labor_sieve.config import MAX_TIMEOUT_SECONDS, config_from_data
 from labor_sieve.sources.sample import SampleSource
 
 
@@ -144,6 +144,60 @@ def test_update_presets_rejects_excessive_timeout(capsys):
     assert f"--timeout-seconds must be an integer from 1 to {MAX_TIMEOUT_SECONDS}." in capsys.readouterr().err
 
 
+def test_list_companies_filters_by_source_and_search(capsys):
+    assert main(["list-companies", "--source", "greenhouse", "--search", "coreweave"]) == 0
+
+    output = capsys.readouterr().out
+    assert "Available companies:" in output
+    assert "coreweave - CoreWeave" in output
+    assert "greenhouse: board_token=coreweave" in output
+    assert "nvidia - NVIDIA" not in output
+
+
+def test_enable_company_updates_config_and_writes_backup(tmp_path, capsys):
+    config_path = tmp_path / "config.yaml"
+    data = yaml.safe_load((ROOT / "config.example.yaml").read_text(encoding="utf-8"))
+    data["sources"]["greenhouse"]["enabled"] = False
+    data["sources"]["greenhouse"]["board_tokens"] = []
+    config_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+
+    assert main(["enable-company", "coreweave", "-c", str(config_path)]) == 0
+
+    output = capsys.readouterr().out
+    updated = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    assert "Config updated:" in output
+    assert (tmp_path / "config.yaml.bak").exists()
+    assert updated["sources"]["greenhouse"]["enabled"] is True
+    assert updated["sources"]["greenhouse"]["board_tokens"] == ["coreweave"]
+
+
+def test_schema_command_prints_json_schema(capsys):
+    assert main(["schema"]) == 0
+
+    output = capsys.readouterr().out
+    assert '"title": "LaborSieve config.yaml"' in output
+    assert '"sources"' in output
+
+
+def test_completions_command_prints_requested_shell(capsys):
+    assert main(["completions", "bash"]) == 0
+
+    output = capsys.readouterr().out
+    assert "complete -F _labor_sieve labor-sieve" in output
+
+
+def test_filtered_run_config_limits_to_catalog_company():
+    data = yaml.safe_load((ROOT / "config.example.yaml").read_text(encoding="utf-8"))
+    config = config_from_data(data)
+
+    filtered = filtered_run_config(config, source_filters=None, company_keys=["coreweave"])
+
+    assert filtered.sources.greenhouse.enabled is True
+    assert filtered.sources.greenhouse.board_tokens == ["coreweave"]
+    assert filtered.sources.ashby.enabled is False
+    assert filtered.sources.workday.enabled is False
+
+
 def test_config_upgrade_command_adds_missing_sections(tmp_path, capsys):
     config_path = tmp_path / "config.yaml"
     write_legacy_sample_config(config_path)
@@ -180,6 +234,17 @@ def test_doctor_passes_with_valid_config(tmp_path, capsys):
     output = capsys.readouterr().out
     assert "LaborSieve" in output
     assert "[ok] Config file:" in output
+
+
+def test_doctor_catalog_checks_packaged_catalog(tmp_path, capsys):
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text((ROOT / "config.example.yaml").read_text(encoding="utf-8"), encoding="utf-8")
+
+    assert main(["doctor", "--catalog", "-c", str(config_path)]) == 0
+
+    output = capsys.readouterr().out
+    assert "[ok] Company catalog:" in output
+    assert "[ok] Catalog verification freshness:" in output
 
 
 def test_doctor_fails_when_config_is_missing(tmp_path, capsys):

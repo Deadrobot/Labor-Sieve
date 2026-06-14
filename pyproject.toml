@@ -49,9 +49,13 @@ version = { attr = "labor_sieve.__version__" }
 [tool.setuptools.exclude-package-data]
 "*" = ["__pycache__/*", "*.pyc", "*.pyo"]
 
+[tool.setuptools.package-data]
+labor_sieve = ["company_catalog.yaml"]
+
 [tool.setuptools.data-files]
 "share/labor-sieve" = [
   "config.example.yaml",
+  "labor_sieve/company_catalog.yaml",
   "SECURITY.md",
   "SECURITY_REVIEW.md",
 ]

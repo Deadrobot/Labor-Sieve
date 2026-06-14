@@ -148,6 +148,10 @@ output:
   terminal_p0_limit: 10
   terminal_p1_limit: 15
 
+update_check:
+  enabled: true
+  interval_days: 7
+
 sources:
   # Synthetic local sample data is disabled by default so normal runs use live sources.
   sample:

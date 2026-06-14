@@ -5,6 +5,7 @@ include RELEASE.md
 include SECURITY.md
 include SECURITY_REVIEW.md
 include config.example.yaml
+include labor_sieve/company_catalog.yaml
 recursive-include presets *.yaml
 recursive-include scripts *.sh
 recursive-include scripts *.py
