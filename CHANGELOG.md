@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.16
+
 ## 0.1.15
 
 - Treat ASL and American Sign Language language requirements as neutral by default.
